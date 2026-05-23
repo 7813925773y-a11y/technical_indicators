@@ -1,0 +1,218 @@
+//@version=6
+// Market Cycle Projection Engine v2.0 — AleksDU
+
+indicator("Market Cycle Projection Engine",
+          shorttitle        = "MCPE",
+          overlay           = true,
+          max_boxes_count   = 20,
+          max_lines_count   = 50,
+          max_labels_count  = 50)
+
+type CycleZone
+    int    start_bar
+    int    end_bar
+    float  top
+    float  bot
+    string phase
+    box    zbox
+    label  zlabel
+
+var string G_A = "Module A: Cycle Detection"
+cycle_len  = input.int(50,    "Cycle lookback (bars)", group=G_A, minval=20, maxval=200)
+show_zones = input.bool(true, "Show cycle zones",      group=G_A)
+
+var string G_B = "Module B: Key Levels"
+show_levels = input.bool(true, "Show key S/R levels", group=G_B)
+sr_lookback = input.int(30,   "S/R pivot lookback",   group=G_B, minval=10, maxval=100)
+level_ext   = input.int(30,   "Extend levels (bars)", group=G_B, minval=5,  maxval=100)
+
+var string G_C = "Module C: Projection"
+show_proj   = input.bool(true, "Show projection",     group=G_C)
+proj_len    = input.int(100,   "Projection bars",     group=G_C, minval=30, maxval=300)
+proj_source = input.string("Last Cycle", "Projection basis",
+              options=["Cycle Average", "Last Cycle", "ATR Multiple"], group=G_C)
+
+var string G_D = "Dashboard"
+show_dash   = input.bool(true, "Show Dashboard",      group=G_D)
+
+atr14    = ta.atr(14)
+atr_slow = ta.atr(cycle_len)
+vol_sma  = ta.sma(volume, 20)
+
+cycle_high  = ta.highest(high, cycle_len)
+cycle_low   = ta.lowest (low,  cycle_len)
+cycle_range = cycle_high - cycle_low
+cycle_mid   = (cycle_high + cycle_low) / 2
+
+lr_slope      = ta.linreg(close, cycle_len, 0) - ta.linreg(close, cycle_len, 1)
+lr_slope_norm = lr_slope / math.max(atr14, 0.0001)
+atr_ratio     = atr14 / math.max(atr_slow, 0.0001)
+expanding     = atr_ratio > 1.1
+contracting   = atr_ratio < 0.85
+vol_rising    = volume > vol_sma * 1.2
+vol_falling   = volume < vol_sma * 0.8
+price_pos     = (close - cycle_low) / math.max(cycle_range, 0.0001)
+
+string cycle_phase = ""
+color  phase_col   = color.gray
+
+if lr_slope_norm > 0.1 and expanding
+    cycle_phase := "Markup"
+    phase_col   := #00e676
+else if lr_slope_norm < -0.1 and expanding
+    cycle_phase := "Markdown"
+    phase_col   := #ff5252
+else if lr_slope_norm >= -0.1 and lr_slope_norm <= 0.1 and price_pos < 0.4
+    cycle_phase := "Accumulation"
+    phase_col   := #00bcd4
+else if lr_slope_norm >= -0.1 and lr_slope_norm <= 0.1 and price_pos >= 0.4
+    cycle_phase := "Distribution"
+    phase_col   := #ff9800
+else
+    cycle_phase := "Transition"
+    phase_col   := #7c4dff
+
+var string prev_phase      = ""
+var int    phase_start_bar = 0
+phase_changed = cycle_phase != prev_phase
+
+if phase_changed
+    prev_phase      := cycle_phase
+    phase_start_bar := bar_index
+
+phase_duration = bar_index - phase_start_bar
+
+zone_col(string ph) => ph == "Accumulation" ? color.new(#00bcd4, 88) : ph == "Markup" ? color.new(#00e676, 90) : ph == "Distribution" ? color.new(#ff9800, 88) : ph == "Markdown" ? color.new(#ff5252, 90) : color.new(#7c4dff, 92)
+zone_brd(string ph) => ph == "Accumulation" ? color.new(#00bcd4, 45) : ph == "Markup" ? color.new(#00e676, 50) : ph == "Distribution" ? color.new(#ff9800, 45) : ph == "Markdown" ? color.new(#ff5252, 50) : color.new(#7c4dff, 55)
+
+var array<CycleZone> zones = array.new<CycleZone>()
+
+if show_zones and phase_changed and phase_start_bar > cycle_len
+    int   zdur   = math.max(phase_duration, 10)
+    int   zstart = math.max(phase_start_bar - zdur, 0)
+    float zmid   = (ta.highest(high, zdur)[0] + ta.lowest(low, zdur)[0]) / 2
+    float zh     = zmid + atr14 * 1.5
+    float zl     = zmid - atr14 * 1.5
+    string old_ph = prev_phase == "Markup" ? "Accumulation" : prev_phase == "Distribution" ? "Markup" : prev_phase == "Markdown" ? "Distribution" : "Markdown"
+    CycleZone z = CycleZone.new(zstart, phase_start_bar, zh, zl, old_ph,
+         box.new(zstart, zh, phase_start_bar, zl,
+                 bgcolor=zone_col(old_ph), border_color=zone_brd(old_ph), border_width=1),
+         label.new(zstart + zdur / 2, zh, old_ph,
+                   color=zone_brd(old_ph), textcolor=color.white,
+                   size=size.tiny, style=label.style_label_down))
+    array.push(zones, z)
+
+if array.size(zones) > 6
+    CycleZone old = array.shift(zones)
+    box.delete(old.zbox)
+    label.delete(old.zlabel)
+
+var int r_count = 0
+var int s_count = 0
+
+ph5 = ta.pivothigh(high, sr_lookback, sr_lookback)
+pl5 = ta.pivotlow (low,  sr_lookback, sr_lookback)
+
+if show_levels
+    if not na(ph5) and r_count < 5
+        line.new(bar_index - sr_lookback, ph5, bar_index + level_ext, ph5,
+                 color=color.new(#ff5252, 35), width=1, style=line.style_dashed)
+        label.new(bar_index + level_ext, ph5, "R  " + str.tostring(math.round(ph5)),
+                  color=color.new(#ff5252, 30), textcolor=color.white,
+                  size=size.tiny, style=label.style_label_left)
+        r_count := r_count + 1
+    if not na(pl5) and s_count < 5
+        line.new(bar_index - sr_lookback, pl5, bar_index + level_ext, pl5,
+                 color=color.new(#00e676, 35), width=1, style=line.style_dashed)
+        label.new(bar_index + level_ext, pl5, "S  " + str.tostring(math.round(pl5)),
+                  color=color.new(#00e676, 30), textcolor=color.white,
+                  size=size.tiny, style=label.style_label_left)
+        s_count := s_count + 1
+
+if show_levels and barstate.islast
+    line.new(bar_index - cycle_len, cycle_high, bar_index + level_ext, cycle_high,
+             color=color.new(#ff5252, 15), width=2)
+    label.new(bar_index + level_ext, cycle_high, "Cycle High",
+              color=color.new(#ff5252, 15), textcolor=color.white,
+              size=size.small, style=label.style_label_left)
+    line.new(bar_index - cycle_len, cycle_low, bar_index + level_ext, cycle_low,
+             color=color.new(#00e676, 15), width=2)
+    label.new(bar_index + level_ext, cycle_low, "Cycle Low",
+              color=color.new(#00e676, 15), textcolor=color.white,
+              size=size.small, style=label.style_label_left)
+    line.new(bar_index - cycle_len, cycle_mid, bar_index + level_ext, cycle_mid,
+             color=color.new(#7c4dff, 40), width=1, style=line.style_dotted)
+    label.new(bar_index + level_ext, cycle_mid, "Mid",
+              color=color.new(#7c4dff, 40), textcolor=color.white,
+              size=size.tiny, style=label.style_label_left)
+
+proj_up = cycle_phase == "Accumulation" or cycle_phase == "Markdown"
+
+float proj_amplitude = 0.0
+if proj_source == "Cycle Average"
+    proj_amplitude := atr_slow * math.sqrt(float(cycle_len)) * 0.4
+else if proj_source == "Last Cycle"
+    proj_amplitude := cycle_range * 0.75
+else
+    proj_amplitude := atr14 * 30.0
+
+if show_proj and barstate.islast
+    float ep = proj_up ? close + proj_amplitude : close - proj_amplitude
+    color ac  = proj_up ? color.new(#00e676, 15) : color.new(#ff5252, 15)
+    color acd = proj_up ? color.new(#00e676, 60) : color.new(#ff5252, 60)
+    int   re  = bar_index + proj_len
+    line.new(bar_index, close, re, ep, color=ac, width=3)
+    line.new(bar_index, close + atr14 * 3, re, ep + atr14 * 3, color=acd, width=1, style=line.style_dotted)
+    line.new(bar_index, close - atr14 * 3, re, ep - atr14 * 3, color=acd, width=1, style=line.style_dotted)
+    label.new(re, ep,
+              (proj_up ? "+" : "-") + str.tostring(math.round(proj_amplitude / close * 100, 1)) + "%",
+              color=ac, textcolor=color.white, size=size.large,
+              style=proj_up ? label.style_label_up : label.style_label_down)
+    string next_ph = cycle_phase == "Accumulation" ? "Next: Markup" : cycle_phase == "Markup" ? "Next: Distribution" : cycle_phase == "Distribution" ? "Next: Markdown" : "Next: Accumulation"
+    label.new(bar_index + proj_len / 2, proj_up ? ep + atr14 * 5 : ep - atr14 * 5,
+              next_ph, color=acd, textcolor=color.white,
+              size=size.small, style=label.style_label_center)
+
+cycle_strength = math.round(math.abs(price_pos - 0.5) * 200)
+
+if show_dash and barstate.islast
+    var table dash = table.new(position.top_right, 2, 9,
+                               bgcolor=color.new(#0d1117, 8),
+                               border_color=color.new(#21262d, 35), border_width=1,
+                               frame_color=color.new(#00bcd4, 30), frame_width=1)
+    table.cell(dash, 0, 0, "Market Cycle Projection", bgcolor=color.new(#161b22, 10),
+               text_color=#00bcd4, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 1, 0, "AleksDU", bgcolor=color.new(#161b22, 10),
+               text_color=color.new(#00bcd4, 50), text_size=size.tiny, text_halign=text.align_center)
+    table.cell(dash, 0, 1, "Cycle Phase",    text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 1, cycle_phase,      text_color=phase_col,  text_size=size.small)
+    table.cell(dash, 0, 2, "Phase Duration", text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 2, str.tostring(phase_duration) + " bars", text_color=color.white, text_size=size.small)
+    table.cell(dash, 0, 3, "Cycle Strength", text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 3, str.tostring(cycle_strength) + " / 100",
+               text_color=cycle_strength > 60 ? #00e676 : cycle_strength > 30 ? #ffeb3b : color.gray, text_size=size.small)
+    table.cell(dash, 0, 4, "Cycle Position", text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 4, str.tostring(math.round(price_pos * 100)) + "%",
+               text_color=price_pos > 0.7 ? #ff5252 : price_pos < 0.3 ? #00e676 : #ffeb3b, text_size=size.small)
+    table.cell(dash, 0, 5, "Volatility",     text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 5, expanding ? "Expanding" : contracting ? "Contracting" : "Normal",
+               text_color=expanding ? #ff9800 : contracting ? #00bcd4 : color.gray, text_size=size.small)
+    table.cell(dash, 0, 6, "Volume",         text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 6, vol_rising ? "Elevated" : vol_falling ? "Low" : "Normal",
+               text_color=vol_rising ? #ffe57f : vol_falling ? #7c4dff : color.gray, text_size=size.small)
+    table.cell(dash, 0, 7, "Projection",     text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 7, proj_up ? "Upward" : "Downward",
+               text_color=proj_up ? #00e676 : #ff5252, text_size=size.small)
+    table.cell(dash, 0, 8, "Proj. Target",   text_color=color.gray, text_size=size.small)
+    table.cell(dash, 1, 8, str.tostring(math.round(proj_amplitude / close * 100, 1)) + "%",
+               text_color=proj_up ? #00e676 : #ff5252, text_size=size.small)
+
+barcolor(cycle_phase == "Accumulation" ? color.new(#00bcd4, 72) :
+         cycle_phase == "Markup"       ? color.new(#00e676, 72) :
+         cycle_phase == "Distribution" ? color.new(#ff9800, 72) :
+         cycle_phase == "Markdown"     ? color.new(#ff5252, 72) : na)
+
+alertcondition(phase_changed and cycle_phase == "Accumulation", "MCPE: Accumulation", "Market Cycle: Accumulation phase detected")
+alertcondition(phase_changed and cycle_phase == "Markup",       "MCPE: Markup",       "Market Cycle: Markup phase detected")
+alertcondition(phase_changed and cycle_phase == "Distribution", "MCPE: Distribution", "Market Cycle: Distribution phase detected")
+alertcondition(phase_changed and cycle_phase == "Markdown",     "MCPE: Markdown",     "Market Cycle: Markdown phase detected")

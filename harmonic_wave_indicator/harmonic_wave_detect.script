@@ -1,0 +1,3125 @@
+//@version=6
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Harmonic Auto-Validator [GBB] — v1.1
+// ─────────────────────────────────────────────────────────────────────────────
+//  Author:   The Good, the Bad and the Bitcoin
+//  License:  © All rights reserved. Subject to TradingView's Terms of Service.
+//
+//  v1.1 CHANGES
+//  ────────────
+//  Adds Forming Mode (opt-in). Projects the PRZ from X/A/B/C before D prints,
+//  exposing the canonical Carney workflow of pre-placing limit orders at the
+//  projected reversal zone rather than waiting for D confirmation. Forming
+//  patterns render with dotted legs, a (F) prefix, and DO NOT trigger alerts.
+//  Off by default to preserve the v1.0 confirmed-only experience for new users.
+//
+//  WHAT IT DOES
+//  ────────────
+//  HAV detects harmonic price patterns with strict adherence to Scott Carney's
+//  methodology. Every detection includes a Potential Reversal Zone (PRZ) computed
+//  as the convergence envelope of multiple Fibonacci projections, an embedded
+//  AB=CD validation check, and a 0-10 quality score combining ratio precision,
+//  zone tightness, and projection confluence.
+//
+//  PATTERNS DETECTED
+//  ─────────────────
+//    • Gartley     (retrace,   D between X and A, B≈0.618 / D≈0.786)
+//    • Bat         (retrace,   D between X and A, B≈0.500 / D≈0.886)
+//    • Alt Bat     (extension, D beyond X,        B≈0.382 / D≈1.130)
+//    • Butterfly   (extension, D beyond X,        B≈0.786 / D≈1.272)
+//    • Crab        (extension, D beyond X,        B≈0.500 / D≈1.618)
+//    • Deep Crab   (extension, D beyond X,        B≈0.886 / D≈1.618)
+//
+//  WHAT MAKES IT DIFFERENT
+//  ───────────────────────
+//    1. PRZ rendered as a ZONE, not a single line. Most indicators show D as a
+//       single Fibonacci level. Carney's methodology defines D as a zone where
+//       multiple projections converge. HAV computes that zone with outlier
+//       filtering and shows it.
+//
+//    2. Embedded AB=CD validation. Carney requires that an AB=CD projection
+//       falls within the PRZ for the pattern to be high-conviction. HAV checks
+//       this and applies a -2 score penalty when the AB=CD does not converge,
+//       displaying a ⚠ warning glyph on the pattern label.
+//
+//    3. Confirmed-only display by default. No projected/forming patterns that
+//       might disappear later. When HAV draws a pattern, it has fully validated.
+//
+//    4. Quality scoring (0-10) combining ratio precision, PRZ tightness vs ATR,
+//       and number of projections in confluence. Patterns scoring below the
+//       configurable threshold are filtered, not displayed.
+//
+//    5. Borderline mode: opt-in display of patterns scoring 4.0-5.9 (below the
+//       confirmation threshold) with dashed legs and "(B)" prefix. Useful for
+//       educational context and confluence with other tools. Borderline patterns
+//       do NOT trigger alerts — alerts remain reserved for confirmed signals.
+//
+//  ALERT DELIVERY
+//  ──────────────
+//    • Unified alert() with structured JSON payload — for webhook integrations
+//      with Telegram bots, Discord, Slack, custom platforms.
+//    • 12 named alertcondition() entries (bullish/bearish × 6 patterns) — for
+//      native TradingView alert UI without webhook infrastructure.
+//
+//  HONEST EXPECTATIONS
+//  ───────────────────
+//  Harmonic patterns are rare on any single chart. Expect roughly:
+//    • 1-4 patterns per year on Daily timeframe
+//    • 5-15 patterns per month on 4H
+//    • 20-50 patterns per week on lower timeframes (5m/15m)
+//
+//  HAV is a CONFLUENCE / VERIFICATION tool, not a high-frequency signal generator.
+//  Best deployed across many instruments and timeframes simultaneously, with
+//  alert delivery routing detected patterns to a single notification stream.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+indicator("Harmonic Auto-Validator [GBB]",
+     shorttitle        = "HAV",
+     overlay           = true,
+     max_lines_count   = 500,
+     max_labels_count  = 500,
+     max_boxes_count   = 500)
+
+// HAV v1.1 — Forming Mode opt-in
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  INPUTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Pattern Selection ──────────────────────────────────────────────────────────
+g_pat = "▼ Pattern Selection"
+i_scan_gartley = input.bool(true, "Gartley",
+     group   = g_pat,
+     tooltip = "Classic Gartley: B=0.618 XA, D=0.786 XA, embedded AB=CD required.")
+i_scan_bat = input.bool(true, "Bat",
+     group   = g_pat,
+     tooltip = "Bat: B=0.382-0.500 XA, D=0.886 XA, embedded AB=CD or 1.27 AB=CD required.")
+i_scan_alt_bat = input.bool(true, "Alternate Bat",
+     group   = g_pat,
+     tooltip = "Alt Bat: B≤0.382 XA (shallow retrace), D=1.13 XA (D extends BEYOND X), 1.27 AB=CD required.")
+i_scan_butterfly = input.bool(true, "Butterfly",
+     group   = g_pat,
+     tooltip = "Butterfly: B=0.786 XA, D=1.272 XA (extension beyond X), 1.27 AB=CD convergent.")
+i_scan_crab = input.bool(true, "Crab",
+     group   = g_pat,
+     tooltip = "Crab: B=0.382-0.618 XA, D=1.618 XA (deep extension beyond X), 1.27 AB=CD convergent.")
+i_scan_deep_crab = input.bool(true, "Deep Crab",
+     group   = g_pat,
+     tooltip = "Deep Crab: B=0.886 XA, D=1.618 XA (deep extension beyond X), 1.27 AB=CD convergent.")
+
+// ── Alerts ─────────────────────────────────────────────────────────────────────
+g_alert = "▼ Alerts"
+i_enable_alerts = input.bool(true, "Enable Alerts",
+     group   = g_alert,
+     tooltip = "Master toggle for the unified alert() call. When ON, the indicator " +
+               "fires a JSON alert whenever any pattern is confirmed. Use this with " +
+               "TradingView's alert UI (event = 'Any alert() function call'). " +
+               "The 12 named alertcondition() entries are always available regardless.")
+i_alert_min_score = input.float(6.0, "Minimum Score for Alert", minval=0.0, maxval=10.0, step=0.5,
+     group   = g_alert,
+     tooltip = "Patterns scoring below this threshold will be drawn but will NOT trigger " +
+               "the unified alert. Set higher (e.g., 7.0) to filter for higher-conviction " +
+               "patterns when scanning many charts.")
+
+// ── Display Mode ───────────────────────────────────────────────────────────────
+g_dmode = "▼ Display Mode"
+i_show_borderline = input.bool(false, "Show Borderline Patterns",
+     group   = g_dmode,
+     tooltip = "When ON, patterns that pass all ratio gates but score between " +
+               "the borderline threshold and the confirmation threshold are drawn " +
+               "with reduced opacity and dashed legs. Useful for: educational " +
+               "context, confluence with other tools, and seeing the indicator " +
+               "produce more on-chart output between confirmed patterns. " +
+               "Borderline patterns do NOT trigger alerts — alerts remain reserved " +
+               "for confirmed patterns only.")
+i_borderline_min_score = input.float(4.0, "Borderline Min Score",
+     minval=0.0, maxval=10.0, step=0.5,
+     group   = g_dmode,
+     tooltip = "Lower bound for borderline display. Patterns scoring between this " +
+               "value and the main 'Min Score' are shown as borderline. Default 4.0 " +
+               "captures meaningful runners-up; lowering toward 0 will surface very " +
+               "weak patterns and may clutter the chart.")
+
+// ── Forming Mode (advanced) ────────────────────────────────────────────────────
+g_form = "▼ Forming Mode (advanced)"
+i_show_forming = input.bool(false, "Show Forming Patterns",
+     group   = g_form,
+     tooltip = "When ON, projects PRZ zones from X/A/B/C BEFORE D prints. Forming " +
+               "patterns render with dotted legs and a (F) prefix and use a 0-8 score " +
+               "scale (since AB=CD convergence and D ratio precision can't be checked " +
+               "without D). DO NOT trigger alerts — alerts remain reserved for confirmed " +
+               "patterns. Useful for setting up limit orders at projected reversal zones " +
+               "(canonical Carney workflow). Off by default.")
+i_forming_min_score = input.float(4.0, "Forming Min Score",
+     minval=0.0, maxval=8.0, step=0.5,
+     group   = g_form,
+     tooltip = "Forming patterns score 0-8 (vs 0-10 for confirmed) since AB=CD " +
+               "convergence and D ratio precision can't be checked without D. Patterns " +
+               "scoring below this threshold are filtered. Default 4.0 surfaces meaningful " +
+               "anticipatory setups without flooding the chart.")
+i_forming_max_bars = input.int(0, "Forming Time Decay (bars, 0=auto)",
+     minval=0, maxval=500,
+     group   = g_form,
+     tooltip = "Forming pattern auto-deletes after this many bars without D printing. " +
+               "0 = auto (5 × pivot length, so 65 bars on Daily). Set higher to keep " +
+               "patterns visible longer; lower to clean up faster.")
+i_forming_max_atr = input.float(3.0, "Forming Distance Decay (ATR multiples)",
+     minval=1.0, maxval=10.0, step=0.5,
+     group   = g_form,
+     tooltip = "Forming pattern auto-deletes if price moves this many ATR units away " +
+               "from the PRZ in the wrong direction. Catches patterns where price action " +
+               "invalidates the thesis quickly.")
+i_show_failed = input.bool(true, "Show Failed Forming Patterns",
+     group   = g_form,
+     tooltip = "When a forming pattern's D prints but doesn't validate the full ratio " +
+               "gates, briefly show with X marker before auto-removing. Educational — " +
+               "shows which forming setups didn't work out. Does NOT affect alerts or " +
+               "the indicator's signal quality.")
+
+// ── Pivot Detection ────────────────────────────────────────────────────────────
+g_piv = "▼ Pivot Detection"
+i_len_mode = input.string("Auto (Fibonacci by TF)", "Zigzag Length",
+     options = ["Auto (Fibonacci by TF)", "Manual"],
+     group   = g_piv,
+     tooltip = "Auto: 5 for ≤30m, 8 for 1H-4H, 13 for D, 21 for W. Manual: set below.")
+i_len_manual = input.int(8, "Manual Length", minval=2, maxval=50, group=g_piv)
+i_min_xa_atr = input.float(2.0, "Min XA Distance (ATR multiples)",
+     minval  = 0.5,
+     step    = 0.1,
+     group   = g_piv,
+     tooltip = "Reject patterns where the XA leg is smaller than N × ATR (noise filter).")
+
+// ── Validation ─────────────────────────────────────────────────────────────────
+g_val = "▼ Validation"
+i_preset = input.string("Standard", "Tolerance Preset",
+     options = ["Strict", "Standard", "Lenient"],
+     group   = g_val,
+     tooltip = "Controls how much deviation from Carney's ideal Fibonacci ratios " +
+               "is accepted. Strict: ±0.020 around each ideal — only near-perfect " +
+               "patterns. Standard: ±0.060 — recommended starting point. Lenient: " +
+               "±0.100 — surfaces more patterns at the cost of geometric purity. " +
+               "If you're seeing too few patterns on your charts, try Lenient first.")
+i_penalize_no_abcd = input.bool(true, "Penalize Non-Convergent AB=CD",
+     group   = g_val,
+     tooltip = "If ON: patterns whose internal AB=CD projection doesn't land inside " +
+               "the PRZ get a -2 score penalty. If OFF: warning ⚠ icon shown but no " +
+               "score impact. Carney considers AB=CD convergence essential to a " +
+               "high-conviction pattern.")
+
+// ── PRZ & Scoring ──────────────────────────────────────────────────────────────
+g_sco = "▼ PRZ & Scoring"
+i_min_score = input.int(6, "Minimum Score (0-10)",
+     minval  = 0,
+     maxval  = 10,
+     group   = g_sco,
+     tooltip = "Patterns scoring below this threshold are suppressed entirely. " +
+               "The 0-10 score combines ratio precision, PRZ tightness vs ATR, " +
+               "and projection confluence count. Recommended: 6. Lower to 4-5 to " +
+               "see more borderline patterns; raise to 7-8 to filter for only the " +
+               "highest-conviction setups.")
+i_min_conf = input.int(2, "Min Confluence Count",
+     minval  = 0,
+     maxval  = 5,
+     group   = g_sco,
+     tooltip = "Minimum number of Fibonacci projections that must land inside the " +
+               "final PRZ zone for the pattern to be valid. Each pattern type uses " +
+               "4-5 projections (e.g., Gartley uses 0.786 XA + 1.27 BC + 1.618 BC + " +
+               "AB=CD). Default 2 strikes a balance between strictness and detection " +
+               "rate.")
+i_log_mode = input.string("Off", "Log Scale",
+     options = ["Auto", "On", "Off"],
+     group   = g_sco,
+     tooltip = "Affects all Fibonacci math. A linear Gartley with AB=0.618 of XA " +
+               "measures ~0.591 in log space, so log mode uses different (narrower) " +
+               "patterns than visual/linear convention. Off = matches Carney's classic " +
+               "books and is recommended for most use cases. Auto = on for crypto.")
+
+// ── Volatility Filter ─────────────────────────────────────────────────────────
+g_risk = "▼ Volatility Filter"
+i_atr_period = input.int(14, "ATR Period", minval=1, group=g_risk,
+     tooltip = "ATR length used for the XA-leg noise filter. Lower values are more " +
+               "responsive to recent volatility; higher values are more stable across regimes.")
+
+// ── Display ────────────────────────────────────────────────────────────────────
+g_disp = "▼ Display"
+i_clean = input.bool(false, "Clean Display (minimal labels)", group=g_disp)
+i_show_pat_label = input.bool(true,  "Show Pattern Name + Score", group=g_disp)
+i_show_ratio_labels = input.bool(true, "Show Ratio Labels on Legs", group=g_disp)
+i_show_pivot_labels = input.bool(true, "Show Pivot Labels (X/A/B/C/D)", group=g_disp)
+i_show_pivot_markers = input.bool(true, "Show Pivot Markers (zigzag dots)",
+     group   = g_disp,
+     tooltip = "Plots small triangle markers above/below all detected pivots " +
+               "(not just pivots in confirmed patterns). Useful for visualizing " +
+               "the zigzag the indicator is using internally.")
+i_show_projections = input.bool(false, "Show PRZ Projection Lines",
+     group   = g_disp,
+     tooltip = "Draws each individual PRZ projection (0.786 XA, 1.27 BC, 1.618 BC, " +
+               "AB=CD, etc.) as dashed lines. Verbose — off by default.")
+i_color_bull = input.color(#26A69A, "Bullish Color", group=g_disp)
+i_color_bear = input.color(#EF5350, "Bearish Color", group=g_disp)
+i_color_warn = input.color(#FFB300, "Warning Color (AB=CD Non-Convergence)", group=g_disp)
+
+// ── Maintenance ────────────────────────────────────────────────────────────────
+g_maint = "▼ Maintenance"
+i_max_active = input.int(30, "Max Stored Patterns", minval=5, maxval=100,
+     group   = g_maint,
+     tooltip = "Upper bound on pattern array size to prevent memory bloat. Old patterns are FIFO-evicted.")
+
+// ── Diagnostics (advanced) ─────────────────────────────────────────────────────
+g_diag = "▼ Diagnostics (advanced)"
+i_show_diagnostics = input.bool(true, "Show Diagnostics Table",
+     group   = g_diag,
+     tooltip = "Displays a debug table in the top-right with detection statistics: " +
+               "windows tested, per-gate rejection counts, ratio distributions, and " +
+               "pattern acceptance breakdown. ON by default — the diagnostics are part " +
+               "of HAV's transparency: you can see exactly how many candidates were " +
+               "evaluated and where they were filtered. Toggle off if it clutters " +
+               "your chart.")
+i_show_distribution = input.bool(false, "Show Distribution Stats (advanced)",
+     group   = g_diag,
+     tooltip = "Adds 4 extra rows to the diagnostics table showing the min/avg/max " +
+               "distribution of r_AB and r_XD ratios across all candidates that " +
+               "passed structure/XA gates, plus the closest-to-ideal Gartley candidate. " +
+               "Useful for understanding the asset's natural retracement profile " +
+               "(e.g., crypto tends toward Bat-shaped ratios, forex toward Gartley). " +
+               "OFF by default — primarily for advanced users and tolerance calibration.")
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  USER-DEFINED TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type Pivot
+    int   t       = 0       // bar time
+    float price   = 0.0
+    int   bi      = 0       // bar_index
+    bool  isHigh  = false
+
+type Projection
+    string label  = ""
+    float  price  = 0.0
+    bool   in_prz = false
+
+type PRZ
+    float top = 0.0
+    float bot = 0.0
+    array<Projection> projections = na
+    int   confluence_count = 0
+
+type HarmonicPattern
+    string pattern_type   = ""
+    bool   is_bullish     = false
+    Pivot  pX             = na
+    Pivot  pA             = na
+    Pivot  pB             = na
+    Pivot  pC             = na
+    Pivot  pD             = na
+    PRZ    prz            = na
+    float  score          = 0.0
+    bool   abcd_converges = false
+    // State: "Confirmed", "Borderline", "Forming", "Failed"
+    // (Stale patterns are deleted from the array, not kept with this state)
+    string state          = "Confirmed"
+    // Computed ratios (for display); r_CD/r_XD are 0.0 for Forming patterns
+    float  r_AB           = 0.0
+    float  r_BC           = 0.0
+    float  r_CD           = 0.0
+    float  r_XD           = 0.0
+    // Forming-mode lifecycle tracking
+    int    forming_c_bar  = 0     // bar index of C confirmation (used for time-decay)
+    int    failed_at_bar  = 0     // bar index when pattern transitioned to Failed (for fade-out)
+    // Drawing object references (for future cleanup)
+    array<line>  lines    = na
+    array<label> labels   = na
+    array<box>   boxes    = na
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Auto zigzag length by timeframe ────────────────────────────────────────────
+f_auto_length() =>
+    int tf_mins = timeframe.in_seconds(timeframe.period) / 60
+    tf_mins <= 30   ?  5 :
+     tf_mins <= 240  ?  8 :
+     tf_mins <= 1440 ? 13 :
+                       21
+
+int length_eff = i_len_mode == "Manual" ? i_len_manual : f_auto_length()
+
+// ── Log-scale toggle ───────────────────────────────────────────────────────────
+bool use_log = i_log_mode == "On" or (i_log_mode == "Auto" and syminfo.type == "crypto")
+
+// Log-aware price transforms. In log mode, all Fibonacci math operates in log-space.
+f_LP(float p) => use_log ? math.log(p) : p
+f_FP(float p) => use_log ? math.exp(p) : p
+
+// Compute a retracement ratio:  |anchor_far - point| / |anchor_far - anchor_near|
+// This is the canonical "how much of the leg has this point retraced from anchor_far."
+f_retrace_ratio(float anchor_far, float anchor_near, float point) =>
+    float af = f_LP(anchor_far)
+    float an = f_LP(anchor_near)
+    float pp = f_LP(point)
+    math.abs(af - pp) / math.abs(af - an)
+
+// ── Indicators ─────────────────────────────────────────────────────────────────
+float atr_v = ta.atr(i_atr_period)
+
+// ── Tolerance presets (Gartley) ────────────────────────────────────────────────
+// Each returns a tuple [low, high] bounding the acceptable ratio range for the preset.
+// The Standard preset uses Carney's published ranges. Strict narrows; Lenient widens.
+
+// ── Gartley Tolerance Bands by Preset ──────────────────────────────────────────
+// Each returns a tuple [low, high] bounding the acceptable ratio range for the preset.
+
+f_gart_tol_B(bool strict, bool lenient) =>    // AB as retrace of XA, ideal 0.618
+    // Centered on 0.618. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 0.598 : lenient ? 0.518 : 0.558
+    float hi = strict ? 0.638 : lenient ? 0.718 : 0.678
+    [lo, hi]
+
+f_gart_tol_BC(bool strict, bool lenient) =>   // BC as retrace of AB
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_gart_tol_CD(bool strict, bool lenient) =>   // CD as projection of BC
+    float lo = strict ? 1.130 : lenient ? 1.000 : 1.130
+    float hi = strict ? 1.618 : lenient ? 1.800 : 1.618
+    [lo, hi]
+
+f_gart_tol_D(bool strict, bool lenient) =>    // D as retrace of XA, ideal 0.786
+    // Centered on 0.786. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 0.766 : lenient ? 0.686 : 0.726
+    float hi = strict ? 0.806 : lenient ? 0.886 : 0.846
+    [lo, hi]
+
+// ── Bat Tolerance Bands by Preset ──────────────────────────────────────────────
+// Ideal B=0.500, D=0.886. Same structural family as Gartley (D between X and A).
+
+f_bat_tol_B(bool strict, bool lenient) =>     // AB as retrace of XA, ideal 0.500
+    // Centered on 0.500. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    // Carney's B range is 0.382-0.500; we treat 0.500 as ideal and allow symmetric deviation.
+    float lo = strict ? 0.480 : lenient ? 0.400 : 0.440
+    float hi = strict ? 0.520 : lenient ? 0.600 : 0.560
+    [lo, hi]
+
+f_bat_tol_BC(bool strict, bool lenient) =>    // BC as retrace of AB (same range as Gartley)
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_bat_tol_CD(bool strict, bool lenient) =>    // CD as projection of BC, range 1.618-2.618
+    float lo = strict ? 1.618 : lenient ? 1.500 : 1.618
+    float hi = strict ? 2.618 : lenient ? 2.900 : 2.618
+    [lo, hi]
+
+f_bat_tol_D(bool strict, bool lenient) =>     // D as retrace of XA, ideal 0.886
+    // Centered on 0.886. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 0.866 : lenient ? 0.786 : 0.826
+    float hi = strict ? 0.906 : lenient ? 0.986 : 0.946
+    [lo, hi]
+
+// ── Alt Bat Tolerance Bands by Preset ──────────────────────────────────────────
+// Ideal B=0.382, D=1.130. NOTE: D at 1.13 XA means D EXTENDS BEYOND X — this is
+// a different structural family from Gartley/Bat where D sits between X and A.
+
+f_abat_tol_B(bool strict, bool lenient) =>    // AB as retrace of XA, ideal 0.382
+    // Centered on 0.382. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 0.362 : lenient ? 0.282 : 0.322
+    float hi = strict ? 0.402 : lenient ? 0.482 : 0.442
+    [lo, hi]
+
+f_abat_tol_BC(bool strict, bool lenient) =>   // BC as retrace of AB (same range as others)
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_abat_tol_CD(bool strict, bool lenient) =>   // CD as projection of BC, range 2.0-3.618
+    // Alt Bat has deep CD extensions. Strict keeps Carney's range tight; Lenient widens.
+    float lo = strict ? 2.200 : lenient ? 1.618 : 2.000
+    float hi = strict ? 3.400 : lenient ? 4.000 : 3.618
+    [lo, hi]
+
+f_abat_tol_D(bool strict, bool lenient) =>    // D as extension of XA, ideal 1.130
+    // Centered on 1.130. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 1.110 : lenient ? 1.030 : 1.070
+    float hi = strict ? 1.150 : lenient ? 1.230 : 1.190
+    [lo, hi]
+
+// ── Butterfly Tolerance Bands by Preset ────────────────────────────────────────
+// Ideal B=0.786, D=1.272. Extension family — D BEYOND X.
+
+f_bfly_tol_B(bool strict, bool lenient) =>    // AB as retrace of XA, ideal 0.786
+    // Centered on 0.786. Same tolerance philosophy as Gartley D band.
+    float lo = strict ? 0.766 : lenient ? 0.686 : 0.726
+    float hi = strict ? 0.806 : lenient ? 0.886 : 0.846
+    [lo, hi]
+
+f_bfly_tol_BC(bool strict, bool lenient) =>   // BC as retrace of AB (same range as others)
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_bfly_tol_CD(bool strict, bool lenient) =>   // CD as projection of BC, range 1.618-2.618
+    float lo = strict ? 1.618 : lenient ? 1.500 : 1.618
+    float hi = strict ? 2.618 : lenient ? 2.900 : 2.618
+    [lo, hi]
+
+f_bfly_tol_D(bool strict, bool lenient) =>    // D as extension of XA, ideal 1.272
+    // Centered on 1.272. Strict ±0.020, Standard ±0.060, Lenient ±0.100.
+    float lo = strict ? 1.252 : lenient ? 1.172 : 1.212
+    float hi = strict ? 1.292 : lenient ? 1.372 : 1.332
+    [lo, hi]
+
+// ── Crab Tolerance Bands by Preset ─────────────────────────────────────────────
+// Ideal B=0.500, D=1.618. Extension family — D BEYOND X (deeper than Butterfly).
+// B range in Carney is 0.382-0.618; we treat 0.500 as ideal with symmetric tolerance.
+
+f_crab_tol_B(bool strict, bool lenient) =>    // AB as retrace of XA, ideal 0.500
+    float lo = strict ? 0.480 : lenient ? 0.400 : 0.440
+    float hi = strict ? 0.520 : lenient ? 0.618 : 0.560
+    [lo, hi]
+
+f_crab_tol_BC(bool strict, bool lenient) =>   // BC as retrace of AB
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_crab_tol_CD(bool strict, bool lenient) =>   // CD as projection of BC, range 2.618-3.618
+    // Crab has the deepest CD extensions of all patterns.
+    float lo = strict ? 2.618 : lenient ? 2.400 : 2.618
+    float hi = strict ? 3.618 : lenient ? 4.000 : 3.618
+    [lo, hi]
+
+f_crab_tol_D(bool strict, bool lenient) =>    // D as extension of XA, ideal 1.618
+    // Centered on 1.618.
+    float lo = strict ? 1.598 : lenient ? 1.518 : 1.558
+    float hi = strict ? 1.638 : lenient ? 1.718 : 1.678
+    [lo, hi]
+
+// ── Deep Crab Tolerance Bands by Preset ────────────────────────────────────────
+// Ideal B=0.886, D=1.618. Distinguished from Crab solely by B ratio.
+
+f_dcrab_tol_B(bool strict, bool lenient) =>   // AB as retrace of XA, ideal 0.886
+    // Centered on 0.886.
+    float lo = strict ? 0.866 : lenient ? 0.786 : 0.826
+    float hi = strict ? 0.906 : lenient ? 0.986 : 0.946
+    [lo, hi]
+
+f_dcrab_tol_BC(bool strict, bool lenient) =>  // BC as retrace of AB
+    float lo = strict ? 0.382 : lenient ? 0.300 : 0.382
+    float hi = strict ? 0.886 : lenient ? 0.950 : 0.886
+    [lo, hi]
+
+f_dcrab_tol_CD(bool strict, bool lenient) =>  // CD as projection of BC, same as Crab
+    float lo = strict ? 2.618 : lenient ? 2.400 : 2.618
+    float hi = strict ? 3.618 : lenient ? 4.000 : 3.618
+    [lo, hi]
+
+f_dcrab_tol_D(bool strict, bool lenient) =>   // D as extension of XA, ideal 1.618 (same as Crab)
+    float lo = strict ? 1.598 : lenient ? 1.518 : 1.558
+    float hi = strict ? 1.638 : lenient ? 1.718 : 1.678
+    [lo, hi]
+
+bool strict  = i_preset == "Strict"
+bool lenient = i_preset == "Lenient"
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PIVOT DETECTION (single zigzag, strict alternation)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  ta.pivothigh/low confirm `length_eff` bars after the pivot occurred.
+//  When a new pivot prints, we either:
+//    (a) append to the buffer if opposite direction to the last pivot, or
+//    (b) update-in-place if same direction AND more extreme than the last pivot.
+//  This enforces strict alternation: high → low → high → low.
+//
+//  Once a pivot has an opposite-direction pivot after it in the buffer, it is
+//  "locked in" and cannot be updated anymore. Pattern detection only considers
+//  locked pivots (positions 0..n-2 in the buffer), never the latest entry.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var array<Pivot> pivot_buf = array.new<Pivot>(0)
+
+f_push_pivot(Pivot p) =>
+    if pivot_buf.size() == 0
+        pivot_buf.push(p)
+    else
+        Pivot last = pivot_buf.get(pivot_buf.size() - 1)
+        if last.isHigh == p.isHigh
+            // Same direction — keep the more extreme pivot
+            bool more_extreme = p.isHigh ? p.price > last.price : p.price < last.price
+            if more_extreme
+                pivot_buf.set(pivot_buf.size() - 1, p)
+        else
+            pivot_buf.push(p)
+    // Trim buffer (keep last 12)
+    while pivot_buf.size() > 12
+        pivot_buf.shift()
+
+float piv_h = ta.pivothigh(length_eff, length_eff)
+float piv_l = ta.pivotlow(length_eff, length_eff)
+
+// Track new-pivot events by watching the bar_index of the last pivot in the buffer.
+// This catches both (a) new pivots pushed, and (b) last pivot updated in place.
+// Watching buffer SIZE fails once the buffer caps at 12 (push+shift = net 0 change).
+var int last_pivot_bi = -1
+
+if not na(piv_h)
+    Pivot p_new = Pivot.new(time[length_eff], piv_h, bar_index[length_eff], true)
+    f_push_pivot(p_new)
+
+if not na(piv_l)
+    Pivot p_new = Pivot.new(time[length_eff], piv_l, bar_index[length_eff], false)
+    f_push_pivot(p_new)
+
+int  cur_last_bi     = pivot_buf.size() > 0 ? pivot_buf.get(pivot_buf.size() - 1).bi : -1
+bool new_pivot_added = cur_last_bi != last_pivot_bi
+last_pivot_bi := cur_last_bi
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  GARTLEY VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Given 5 consecutive pivots forming a candidate XABCD, validate the Gartley
+//  structural and ratio constraints. Returns [valid, bullish, r_AB, r_BC, r_CD, r_XD].
+//
+//  Ratios:
+//    r_AB = |A - B| / |A - X|   (AB as retrace of XA, ideal 0.618)
+//    r_BC = |B - C| / |B - A|   (BC as retrace of AB, range 0.382-0.886)
+//    r_CD = |C - D| / |C - B|   (CD as projection of BC, range 1.13-1.618)
+//    r_XD = |A - D| / |A - X|   (D location as retrace of XA, ideal 0.786)
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+//
+//  Returns [status, bullish, r_AB, r_BC, r_CD, r_XD] where status codes are:
+//    0 = valid
+//    1 = direction alternation failed
+//    2 = structural ordering failed
+//    3 = XA leg too small (below ATR threshold)
+//    4 = AB ratio out of band
+//    5 = BC ratio out of band
+//    6 = CD ratio out of band
+//    7 = XD ratio out of band
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_gartley(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    // Direction alternation check
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh    // X is a low → bullish Gartley (M-shape inverted)
+
+    // Structural ordering: for bullish, X<A, X<B<A, B<C<A, X<D<C
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price > pX.price and pD.price < pC.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price < pX.price and pD.price > pC.price
+
+    // Noise filter: XA must be at least N × ATR
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        // Compute ratios (log-aware)
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+
+        // Check ratios against tolerance bands
+        [ab_lo, ab_hi] = f_gart_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_gart_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_gart_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_gart_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+        // else status stays 0 (valid)
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  BAT VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Bat shares Gartley's structural family — D sits between X and A. Only the
+//  ratio ideals differ: B=0.500 (shallower than Gartley's 0.618), D=0.886
+//  (deeper than Gartley's 0.786). Status codes identical to Gartley validator.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_bat(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    // Direction alternation check (identical to Gartley)
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh
+
+    // Structural ordering (identical to Gartley — D between X and C, above X)
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price > pX.price and pD.price < pC.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price < pX.price and pD.price > pC.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+
+        [ab_lo, ab_hi] = f_bat_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_bat_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_bat_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_bat_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ALT BAT VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Alt Bat is structurally different: D extends BEYOND X (r_XD > 1.0). This
+//  makes it geometrically closer to Crab/Butterfly than to Gartley/Bat despite
+//  the "retracement" naming. The structural check requires D below X (bullish)
+//  or D above X (bearish).
+//
+//  Ideal ratios: B=0.382 (very shallow retrace), D=1.130 (D 13% past X).
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_alt_bat(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh
+
+    // Structural ordering — note D is BEYOND X (extension)
+    bool struct_ok = false
+    if bullish
+        // Bullish: X low, A high, B < A (shallow retrace from A), C between B and A, D below X
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price < pX.price
+    else
+        // Bearish: X high, A low, B > A (shallow bounce), C between A and B, D above X
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price > pX.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+        // r_XD > 1.0 for Alt Bat since D is past X
+
+        [ab_lo, ab_hi] = f_abat_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_abat_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_abat_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_abat_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  BUTTERFLY VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Butterfly is an extension pattern: D extends beyond X (r_XD > 1.0).
+//  Same structural family as Alt Bat/Crab/Deep Crab — only ratio ideals differ.
+//  Ideals: B=0.786 (deep retrace), D=1.272 (moderate extension beyond X).
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_butterfly(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh
+
+    // Extension structure: D beyond X
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price < pX.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price > pX.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+
+        [ab_lo, ab_hi] = f_bfly_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_bfly_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_bfly_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_bfly_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CRAB VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Crab is the deepest extension of all patterns — D at 1.618 of XA (62% past X).
+//  Ideals: B=0.500 (mid retrace), D=1.618. CD projection 2.618-3.618 of BC.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_crab(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price < pX.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price > pX.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+
+        [ab_lo, ab_hi] = f_crab_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_crab_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_crab_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_crab_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  DEEP CRAB VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Deep Crab differs from Crab only in the B ratio: 0.886 instead of 0.500.
+//  D and CD ideals are identical to Crab. PRZ is also identical to Crab.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_validate_deep_crab(Pivot pX, Pivot pA, Pivot pB, Pivot pC, Pivot pD) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and
+                  (pA.isHigh != pB.isHigh) and
+                  (pB.isHigh != pC.isHigh) and
+                  (pC.isHigh != pD.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price and
+                     pD.price < pX.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price and
+                     pD.price > pX.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+    float r_CD   = 0.0
+    float r_XD   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        r_CD := f_retrace_ratio(pC.price, pB.price, pD.price)
+        r_XD := f_retrace_ratio(pA.price, pX.price, pD.price)
+
+        [ab_lo, ab_hi] = f_dcrab_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_dcrab_tol_BC(strict, lenient)
+        [cd_lo, cd_hi] = f_dcrab_tol_CD(strict, lenient)
+        [d_lo,  d_hi ] = f_dcrab_tol_D(strict, lenient)
+
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        bool cd_ok = r_CD >= cd_lo and r_CD <= cd_hi
+        bool d_ok  = r_XD >= d_lo  and r_XD <= d_hi
+
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+        else if not cd_ok
+            status := 6
+        else if not d_ok
+            status := 7
+
+    [status, bullish, r_AB, r_BC, r_CD, r_XD]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FORMING VALIDATORS  (XABC-only — D not yet printed)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Each forming validator checks the first 5 gates only:
+//    1) Direction alternation (X/A, A/B, B/C — 3 checks instead of 4)
+//    2) Structural ordering through C (no D placement check)
+//    3) XA size filter
+//    4) AB ratio band
+//    5) BC ratio band
+//
+//  Status codes match the confirmed validators (1=dir, 2=struct, 3=XA, 4=AB,
+//  5=BC) for consistency. Codes 6-7 (CD band, D band) are never returned since
+//  D doesn't exist yet.
+//
+//  Returns [status, bullish, r_AB, r_BC]. r_CD and r_XD are unknowable.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Gartley structure (D between X and A — same as confirmed)
+f_validate_gartley_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_gart_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_gart_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// Bat structure (same as Gartley — D between X and A)
+f_validate_bat_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_bat_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_bat_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// Alt Bat structure (extension family — but XABC structure is same as
+// retrace family until D extends past X. So XABC validation is identical
+// to Bat/Gartley until D prints; the difference only manifests on D.)
+f_validate_alt_bat_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_abat_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_abat_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// Butterfly forming (same XABC structure check as retrace family)
+f_validate_butterfly_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_bfly_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_bfly_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// Crab forming
+f_validate_crab_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_crab_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_crab_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// Deep Crab forming
+f_validate_deep_crab_forming(Pivot pX, Pivot pA, Pivot pB, Pivot pC) =>
+    bool dir_ok = (pX.isHigh != pA.isHigh) and (pA.isHigh != pB.isHigh) and (pB.isHigh != pC.isHigh)
+    bool bullish = not pX.isHigh
+
+    bool struct_ok = false
+    if bullish
+        struct_ok := pX.price < pA.price and
+                     pB.price > pX.price and pB.price < pA.price and
+                     pC.price > pB.price and pC.price < pA.price
+    else
+        struct_ok := pX.price > pA.price and
+                     pB.price < pX.price and pB.price > pA.price and
+                     pC.price < pB.price and pC.price > pA.price
+
+    float xa_abs = math.abs(pA.price - pX.price)
+    bool  xa_big_enough = xa_abs >= i_min_xa_atr * atr_v
+
+    int   status = 0
+    float r_AB   = 0.0
+    float r_BC   = 0.0
+
+    if not dir_ok
+        status := 1
+    else if not struct_ok
+        status := 2
+    else if not xa_big_enough
+        status := 3
+    else
+        r_AB := f_retrace_ratio(pA.price, pX.price, pB.price)
+        r_BC := f_retrace_ratio(pB.price, pA.price, pC.price)
+        [ab_lo, ab_hi] = f_dcrab_tol_B(strict, lenient)
+        [bc_lo, bc_hi] = f_dcrab_tol_BC(strict, lenient)
+        bool ab_ok = r_AB >= ab_lo and r_AB <= ab_hi
+        bool bc_ok = r_BC >= bc_lo and r_BC <= bc_hi
+        if not ab_ok
+            status := 4
+        else if not bc_ok
+            status := 5
+
+    [status, bullish, r_AB, r_BC]
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRZ ZONE CONSTRUCTION (Gartley)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  For Gartley, PRZ = min/max envelope of 4 projections:
+//    1)  D at 0.786 retracement of XA
+//    2)  D at 1.27  projection of BC (from C, opposite to C-B direction)
+//    3)  D at 1.618 projection of BC
+//    4)  D at AB=CD (CD leg equals AB leg, applied from C)
+//
+//  Outlier filtering: drop projections > 3 × ATR from the median.
+//  Those projections are still stored (for display) but marked in_prz = false.
+//  Confluence count = number of projections inside the final zone.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_build_gartley_prz(Pivot pX, Pivot pA, Pivot pB, Pivot pC, bool bullish) =>
+    array<Projection> projs = array.new<Projection>(0)
+
+    // Projection 1: 0.786 retracement of XA
+    float d_786 = f_FP(f_LP(pA.price) - 0.786 * (f_LP(pA.price) - f_LP(pX.price)))
+    projs.push(Projection.new("0.786 XA", d_786, false))
+
+    // Projection 2: 1.27 of BC — project D from C opposite to C-B direction
+    float d_127 = f_FP(f_LP(pC.price) - 1.27 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("1.27 BC", d_127, false))
+
+    // Projection 3: 1.618 of BC
+    float d_1618 = f_FP(f_LP(pC.price) - 1.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("1.618 BC", d_1618, false))
+
+    // Projection 4: AB=CD (CD leg has same price distance as AB leg)
+    // ab_vec = log(B) - log(A) is the A→B vector. Apply to C: D = C + (B - A) in log space.
+    float ab_vec = f_LP(pB.price) - f_LP(pA.price)
+    float d_abcd = f_FP(f_LP(pC.price) + ab_vec)
+    projs.push(Projection.new("AB=CD", d_abcd, false))
+
+    // Compute median for outlier filtering
+    array<float> prices = array.new<float>(0)
+    for i = 0 to projs.size() - 1
+        prices.push(projs.get(i).price)
+    float med = array.median(prices)
+
+    // Mark in_prz; build zone from inliers only
+    float prz_top = na
+    float prz_bot = na
+    int   conf_count = 0
+    for i = 0 to projs.size() - 1
+        Projection p = projs.get(i)
+        if math.abs(p.price - med) <= 3.0 * atr_v
+            p.in_prz := true
+            projs.set(i, p)
+            conf_count += 1
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    // Fallback if all filtered out (should not happen in practice)
+    if na(prz_top)
+        for i = 0 to projs.size() - 1
+            Projection p = projs.get(i)
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    PRZ.new(prz_top, prz_bot, projs, conf_count)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRZ ZONE CONSTRUCTION (Bat)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  For Bat, PRZ projections:
+//    1)  D at 0.886 retracement of XA
+//    2)  D at 1.618 projection of BC
+//    3)  D at 2.618 projection of BC
+//    4)  D at AB=CD
+//    5)  D at 1.27 AB=CD (extended AB=CD — Bat accepts either)
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_build_bat_prz(Pivot pX, Pivot pA, Pivot pB, Pivot pC, bool bullish) =>
+    array<Projection> projs = array.new<Projection>(0)
+
+    // 1) 0.886 retracement of XA
+    float d_886 = f_FP(f_LP(pA.price) - 0.886 * (f_LP(pA.price) - f_LP(pX.price)))
+    projs.push(Projection.new("0.886 XA", d_886, false))
+
+    // 2) 1.618 projection of BC
+    float d_1618 = f_FP(f_LP(pC.price) - 1.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("1.618 BC", d_1618, false))
+
+    // 3) 2.618 projection of BC
+    float d_2618 = f_FP(f_LP(pC.price) - 2.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("2.618 BC", d_2618, false))
+
+    // 4) AB=CD
+    float ab_vec = f_LP(pB.price) - f_LP(pA.price)
+    float d_abcd = f_FP(f_LP(pC.price) + ab_vec)
+    projs.push(Projection.new("AB=CD", d_abcd, false))
+
+    // 5) 1.27 AB=CD
+    float d_abcd_127 = f_FP(f_LP(pC.price) + 1.27 * ab_vec)
+    projs.push(Projection.new("1.27 AB=CD", d_abcd_127, false))
+
+    // Outlier filtering
+    array<float> prices = array.new<float>(0)
+    for i = 0 to projs.size() - 1
+        prices.push(projs.get(i).price)
+    float med = array.median(prices)
+
+    float prz_top = na
+    float prz_bot = na
+    int   conf_count = 0
+    for i = 0 to projs.size() - 1
+        Projection p = projs.get(i)
+        if math.abs(p.price - med) <= 3.0 * atr_v
+            p.in_prz := true
+            projs.set(i, p)
+            conf_count += 1
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    if na(prz_top)
+        for i = 0 to projs.size() - 1
+            Projection p = projs.get(i)
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    PRZ.new(prz_top, prz_bot, projs, conf_count)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRZ ZONE CONSTRUCTION (Alt Bat)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Alt Bat projects D BEYOND X. Projections:
+//    1)  D at 1.13 extension of XA (past X)
+//    2)  D at 2.0  projection of BC
+//    3)  D at 3.618 projection of BC
+//    4)  D at 1.27 AB=CD (Alt Bat requires extended AB=CD, not 1.0)
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_build_alt_bat_prz(Pivot pX, Pivot pA, Pivot pB, Pivot pC, bool bullish) =>
+    array<Projection> projs = array.new<Projection>(0)
+
+    // 1) 1.13 extension of XA — D beyond X
+    float d_113 = f_FP(f_LP(pA.price) - 1.130 * (f_LP(pA.price) - f_LP(pX.price)))
+    projs.push(Projection.new("1.13 XA", d_113, false))
+
+    // 2) 2.0 projection of BC
+    float d_200 = f_FP(f_LP(pC.price) - 2.000 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("2.0 BC", d_200, false))
+
+    // 3) 3.618 projection of BC
+    float d_3618 = f_FP(f_LP(pC.price) - 3.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("3.618 BC", d_3618, false))
+
+    // 4) 1.27 AB=CD
+    float ab_vec = f_LP(pB.price) - f_LP(pA.price)
+    float d_abcd_127 = f_FP(f_LP(pC.price) + 1.27 * ab_vec)
+    projs.push(Projection.new("1.27 AB=CD", d_abcd_127, false))
+
+    // Outlier filtering
+    array<float> prices = array.new<float>(0)
+    for i = 0 to projs.size() - 1
+        prices.push(projs.get(i).price)
+    float med = array.median(prices)
+
+    float prz_top = na
+    float prz_bot = na
+    int   conf_count = 0
+    for i = 0 to projs.size() - 1
+        Projection p = projs.get(i)
+        if math.abs(p.price - med) <= 3.0 * atr_v
+            p.in_prz := true
+            projs.set(i, p)
+            conf_count += 1
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    if na(prz_top)
+        for i = 0 to projs.size() - 1
+            Projection p = projs.get(i)
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    PRZ.new(prz_top, prz_bot, projs, conf_count)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRZ ZONE CONSTRUCTION (Butterfly)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Butterfly projections:
+//    1)  D at 1.272 extension of XA
+//    2)  D at 1.618 projection of BC
+//    3)  D at 2.618 projection of BC
+//    4)  D at 1.27 AB=CD
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_build_butterfly_prz(Pivot pX, Pivot pA, Pivot pB, Pivot pC, bool bullish) =>
+    array<Projection> projs = array.new<Projection>(0)
+
+    // 1) 1.272 extension of XA
+    float d_1272 = f_FP(f_LP(pA.price) - 1.272 * (f_LP(pA.price) - f_LP(pX.price)))
+    projs.push(Projection.new("1.272 XA", d_1272, false))
+
+    // 2) 1.618 projection of BC
+    float d_1618 = f_FP(f_LP(pC.price) - 1.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("1.618 BC", d_1618, false))
+
+    // 3) 2.618 projection of BC
+    float d_2618 = f_FP(f_LP(pC.price) - 2.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("2.618 BC", d_2618, false))
+
+    // 4) 1.27 AB=CD
+    float ab_vec = f_LP(pB.price) - f_LP(pA.price)
+    float d_abcd_127 = f_FP(f_LP(pC.price) + 1.27 * ab_vec)
+    projs.push(Projection.new("1.27 AB=CD", d_abcd_127, false))
+
+    // Outlier filtering
+    array<float> prices = array.new<float>(0)
+    for i = 0 to projs.size() - 1
+        prices.push(projs.get(i).price)
+    float med = array.median(prices)
+
+    float prz_top = na
+    float prz_bot = na
+    int   conf_count = 0
+    for i = 0 to projs.size() - 1
+        Projection p = projs.get(i)
+        if math.abs(p.price - med) <= 3.0 * atr_v
+            p.in_prz := true
+            projs.set(i, p)
+            conf_count += 1
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    if na(prz_top)
+        for i = 0 to projs.size() - 1
+            Projection p = projs.get(i)
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    PRZ.new(prz_top, prz_bot, projs, conf_count)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PRZ ZONE CONSTRUCTION (Crab — shared with Deep Crab)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Crab / Deep Crab projections:
+//    1)  D at 1.618 extension of XA
+//    2)  D at 2.618 projection of BC
+//    3)  D at 3.618 projection of BC
+//    4)  D at 1.27 AB=CD
+//
+//  Same PRZ for both patterns — they're distinguished by B ratio only.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_build_crab_prz(Pivot pX, Pivot pA, Pivot pB, Pivot pC, bool bullish) =>
+    array<Projection> projs = array.new<Projection>(0)
+
+    // 1) 1.618 extension of XA
+    float d_1618_xa = f_FP(f_LP(pA.price) - 1.618 * (f_LP(pA.price) - f_LP(pX.price)))
+    projs.push(Projection.new("1.618 XA", d_1618_xa, false))
+
+    // 2) 2.618 projection of BC
+    float d_2618 = f_FP(f_LP(pC.price) - 2.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("2.618 BC", d_2618, false))
+
+    // 3) 3.618 projection of BC
+    float d_3618 = f_FP(f_LP(pC.price) - 3.618 * (f_LP(pC.price) - f_LP(pB.price)))
+    projs.push(Projection.new("3.618 BC", d_3618, false))
+
+    // 4) 1.27 AB=CD
+    float ab_vec = f_LP(pB.price) - f_LP(pA.price)
+    float d_abcd_127 = f_FP(f_LP(pC.price) + 1.27 * ab_vec)
+    projs.push(Projection.new("1.27 AB=CD", d_abcd_127, false))
+
+    // Outlier filtering
+    array<float> prices = array.new<float>(0)
+    for i = 0 to projs.size() - 1
+        prices.push(projs.get(i).price)
+    float med = array.median(prices)
+
+    float prz_top = na
+    float prz_bot = na
+    int   conf_count = 0
+    for i = 0 to projs.size() - 1
+        Projection p = projs.get(i)
+        if math.abs(p.price - med) <= 3.0 * atr_v
+            p.in_prz := true
+            projs.set(i, p)
+            conf_count += 1
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    if na(prz_top)
+        for i = 0 to projs.size() - 1
+            Projection p = projs.get(i)
+            prz_top := na(prz_top) ? p.price : math.max(prz_top, p.price)
+            prz_bot := na(prz_bot) ? p.price : math.min(prz_bot, p.price)
+
+    PRZ.new(prz_top, prz_bot, projs, conf_count)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SCORING (0–10)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Three components:
+//    Ratio precision  (0-4): mean proximity of r_AB and r_XD to their ideals
+//    PRZ tightness    (0-3): 1 - (zone_height / (3 × ATR)), clipped to [0,1], × 3
+//    Confluence count (0-3): number of projections in final PRZ, capped at 3
+//
+//  Penalty: if AB=CD does not converge inside the PRZ AND user has enabled penalty,
+//  subtract 2 from the total (minimum 0).
+//
+//  Per-pattern ideals:
+//    Gartley  — B=0.618 / D=0.786
+//    Bat      — B=0.500 / D=0.886
+//    Alt Bat  — B=0.382 / D=1.130
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_score_gartley(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Ratio precision (normalized by Lenient band half-width = 0.100 for both)
+    float ab_dev  = math.abs(r_AB - 0.618)
+    float xd_dev  = math.abs(r_XD - 0.786)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0   // 0–4
+
+    // PRZ zone tightness
+    float zone_h   = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0              // 0–3
+
+    // Confluence
+    float conf_score = math.min(prz.confluence_count, 3)   // 0–3
+
+    float total = ratio_score + tight_score + conf_score
+
+    // AB=CD non-convergence penalty (only if user opted in)
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+f_score_bat(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Bat ideals: B=0.500, D=0.886
+    float ab_dev  = math.abs(r_AB - 0.500)
+    float xd_dev  = math.abs(r_XD - 0.886)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0
+
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+
+    float conf_score = math.min(prz.confluence_count, 3)
+
+    float total = ratio_score + tight_score + conf_score
+
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+f_score_alt_bat(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Alt Bat ideals: B=0.382, D=1.130
+    float ab_dev  = math.abs(r_AB - 0.382)
+    float xd_dev  = math.abs(r_XD - 1.130)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0
+
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+
+    float conf_score = math.min(prz.confluence_count, 3)
+
+    float total = ratio_score + tight_score + conf_score
+
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+f_score_butterfly(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Butterfly ideals: B=0.786, D=1.272
+    float ab_dev  = math.abs(r_AB - 0.786)
+    float xd_dev  = math.abs(r_XD - 1.272)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0
+
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+
+    float conf_score = math.min(prz.confluence_count, 3)
+
+    float total = ratio_score + tight_score + conf_score
+
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+f_score_crab(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Crab ideals: B=0.500, D=1.618
+    float ab_dev  = math.abs(r_AB - 0.500)
+    float xd_dev  = math.abs(r_XD - 1.618)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0
+
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+
+    float conf_score = math.min(prz.confluence_count, 3)
+
+    float total = ratio_score + tight_score + conf_score
+
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+f_score_deep_crab(float r_AB, float r_XD, PRZ prz, bool abcd_conv) =>
+    // Deep Crab ideals: B=0.886, D=1.618
+    float ab_dev  = math.abs(r_AB - 0.886)
+    float xd_dev  = math.abs(r_XD - 1.618)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float xd_norm = 1.0 - math.min(xd_dev / 0.100, 1.0)
+    float ratio_score = (ab_norm + xd_norm) * 2.0
+
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+
+    float conf_score = math.min(prz.confluence_count, 3)
+
+    float total = ratio_score + tight_score + conf_score
+
+    if not abcd_conv and i_penalize_no_abcd
+        total := math.max(0.0, total - 2.0)
+
+    math.round(total * 10.0) / 10.0
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FORMING SCORING  (0-8 scale — no r_XD, no AB=CD penalty)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Forming patterns can't compute the full 0-10 score because:
+//    • r_XD doesn't exist (D not yet printed) → ratio precision halved (max 2.0)
+//    • AB=CD convergence inside PRZ can't be checked → no penalty applied
+//
+//  Components retained:
+//    • Ratio precision  (0-2): only ab_norm × 2.0
+//    • PRZ tightness    (0-3): same as confirmed
+//    • Confluence count (0-3): same as confirmed
+//
+//  Max forming score = 8.0. Display as "[X.X/8]" in labels to signal the
+//  asymmetry vs confirmed patterns scoring on /10.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_score_gartley_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.618)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+f_score_bat_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.500)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+f_score_alt_bat_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.382)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+f_score_butterfly_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.786)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+f_score_crab_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.500)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+f_score_deep_crab_forming(float r_AB, PRZ prz) =>
+    float ab_dev  = math.abs(r_AB - 0.886)
+    float ab_norm = 1.0 - math.min(ab_dev / 0.100, 1.0)
+    float ratio_score = ab_norm * 2.0
+    float zone_h    = prz.top - prz.bot
+    float tightness = 1.0 - math.min(zone_h / (atr_v * 3.0), 1.0)
+    float tight_score = tightness * 3.0
+    float conf_score = math.min(prz.confluence_count, 3)
+    float total = ratio_score + tight_score + conf_score
+    math.round(total * 10.0) / 10.0
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PATTERN DRAWING  (generic — uses pat.pattern_type for labeling)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_draw_pattern(HarmonicPattern pat) =>
+    color dir_color  = pat.is_bullish ? i_color_bull : i_color_bear
+    bool  warn       = not pat.abcd_converges
+    color line_col   = warn ? i_color_warn : dir_color
+
+    // State flags — exactly one of these is true (or neither for Confirmed)
+    bool is_borderline = pat.state == "Borderline"
+    bool is_forming    = pat.state == "Forming"
+    bool is_failed     = pat.state == "Failed"
+
+    // Visual hierarchy by state:
+    //   Confirmed:   solid legs,  width 2, full color   — alert-eligible
+    //   Borderline:  dashed legs, width 1, dimmed       — score 4-5.9
+    //   Forming:     dotted legs, width 1, very faded   — D not yet printed
+    //   Failed:      solid legs,  width 1, gray         — D printed but invalid
+    color leg_col = is_failed ? color.new(color.gray, 25) : is_forming ? color.new(line_col, 30) : is_borderline ? color.new(line_col, 45) : line_col
+    string leg_style = is_borderline ? line.style_dashed : is_forming ? line.style_dotted : line.style_solid
+    int leg_width = (is_borderline or is_forming or is_failed) ? 1 : 2
+
+    color prz_fill = is_forming ? color.new(dir_color, 95) : is_borderline ? color.new(dir_color, 92) : color.new(dir_color, 85)
+
+    array<line>  new_lines  = array.new<line>(0)
+    array<label> new_labels = array.new<label>(0)
+    array<box>   new_boxes  = array.new<box>(0)
+
+    // ── Legs ───────────────────────────────────────────────────────────────────
+    // Forming patterns have only X→A, A→B, B→C (no D yet).
+    // Confirmed/Borderline/Failed have all four legs (X→A→B→C→D).
+    new_lines.push(line.new(pat.pX.bi, pat.pX.price, pat.pA.bi, pat.pA.price,
+         color=leg_col, width=leg_width, style=leg_style))
+    new_lines.push(line.new(pat.pA.bi, pat.pA.price, pat.pB.bi, pat.pB.price,
+         color=leg_col, width=leg_width, style=leg_style))
+    new_lines.push(line.new(pat.pB.bi, pat.pB.price, pat.pC.bi, pat.pC.price,
+         color=leg_col, width=leg_width, style=leg_style))
+    if not is_forming
+        new_lines.push(line.new(pat.pC.bi, pat.pC.price, pat.pD.bi, pat.pD.price,
+             color=leg_col, width=leg_width, style=leg_style))
+
+    // ── PRZ zone box ───────────────────────────────────────────────────────────
+    // Confirmed/Borderline: from C to D+10 bars, solid border
+    // Forming:              from C+1 to bar_index+10, dashed border
+    // Failed:               no PRZ box (the prediction was wrong)
+    if not is_failed
+        int box_start  = pat.pC.bi + (is_forming ? 1 : 0)
+        int box_end    = is_forming ? bar_index + 10 : pat.pD.bi + 10
+        color box_col  = is_borderline ? color.new(dir_color, 50) : is_forming ? color.new(dir_color, 30) : dir_color
+        int box_border_w = (is_borderline or is_forming) ? 1 : 2
+        string box_border_style = is_forming ? line.style_dashed : line.style_solid
+        new_boxes.push(box.new(box_start, pat.prz.top, box_end, pat.prz.bot,
+             border_color = box_col,
+             bgcolor      = prz_fill,
+             border_width = box_border_w,
+             border_style = box_border_style))
+
+    // ── Pivot labels ───────────────────────────────────────────────────────────
+    if i_show_pivot_labels and not i_clean
+        color piv_col = is_failed ? color.new(color.gray, 50) : is_forming ? color.new(dir_color, 70) : is_borderline ? color.new(dir_color, 65) : color.new(dir_color, 40)
+        new_labels.push(label.new(pat.pX.bi, pat.pX.price, "X",
+             style=pat.pX.isHigh ? label.style_label_down : label.style_label_up,
+             color=piv_col, textcolor=color.white, size=size.tiny))
+        new_labels.push(label.new(pat.pA.bi, pat.pA.price, "A",
+             style=pat.pA.isHigh ? label.style_label_down : label.style_label_up,
+             color=piv_col, textcolor=color.white, size=size.tiny))
+        new_labels.push(label.new(pat.pB.bi, pat.pB.price, "B",
+             style=pat.pB.isHigh ? label.style_label_down : label.style_label_up,
+             color=piv_col, textcolor=color.white, size=size.tiny))
+        new_labels.push(label.new(pat.pC.bi, pat.pC.price, "C",
+             style=pat.pC.isHigh ? label.style_label_down : label.style_label_up,
+             color=piv_col, textcolor=color.white, size=size.tiny))
+        if not is_forming
+            new_labels.push(label.new(pat.pD.bi, pat.pD.price, "D",
+                 style=pat.pD.isHigh ? label.style_label_down : label.style_label_up,
+                 color=piv_col, textcolor=color.white, size=size.tiny))
+
+    // ── Ratio labels on leg midpoints ──────────────────────────────────────────
+    if i_show_ratio_labels and not i_clean
+        color ratio_col = is_failed ? color.new(color.gray, 60) : is_forming ? color.new(dir_color, 60) : is_borderline ? color.new(dir_color, 55) : color.new(dir_color, 30)
+        int   mid_AB   = math.round((pat.pA.bi + pat.pB.bi) / 2.0)
+        float mid_AB_p = (pat.pA.price + pat.pB.price) / 2.0
+        new_labels.push(label.new(mid_AB, mid_AB_p, str.format("{0,number,#.###}", pat.r_AB),
+             style=label.style_none, textcolor=ratio_col, size=size.tiny))
+
+        int   mid_BC   = math.round((pat.pB.bi + pat.pC.bi) / 2.0)
+        float mid_BC_p = (pat.pB.price + pat.pC.price) / 2.0
+        new_labels.push(label.new(mid_BC, mid_BC_p, str.format("{0,number,#.###}", pat.r_BC),
+             style=label.style_none, textcolor=ratio_col, size=size.tiny))
+
+        if not is_forming
+            int   mid_CD   = math.round((pat.pC.bi + pat.pD.bi) / 2.0)
+            float mid_CD_p = (pat.pC.price + pat.pD.price) / 2.0
+            new_labels.push(label.new(mid_CD, mid_CD_p, str.format("{0,number,#.###}", pat.r_CD),
+                 style=label.style_none, textcolor=ratio_col, size=size.tiny))
+
+    // ── Pattern name + score label ─────────────────────────────────────────────
+    // Forming: positioned at right edge of PRZ box (since D doesn't exist).
+    // Failed:  positioned at D, gray, X marker, no score.
+    // Confirmed/Borderline: positioned at D as before.
+    if i_show_pat_label
+        string arrow      = pat.is_bullish ? "▲ " : "▼ "
+        string warn_mark  = warn ? "  ⚠" : ""
+        string prefix     = is_borderline ? "(B) " : is_forming ? "(F) " : is_failed ? "(✗) " : ""
+        string score_part = is_failed ? "" : is_forming ? "?  [" + str.tostring(pat.score, "#.#") + "/8]" : "  [" + str.tostring(pat.score, "#.#") + "/10]" + warn_mark
+        string pat_txt    = prefix + arrow + pat.pattern_type + score_part
+        color label_col   = is_failed ? color.new(color.gray, 30) : is_forming ? color.new(dir_color, 35) : is_borderline ? color.new(dir_color, 50) : warn ? i_color_warn : dir_color
+        string label_size = (is_borderline or is_forming or is_failed) ? size.small : size.normal
+
+        // Anchor: D for confirmed/borderline/failed; right edge of PRZ for forming
+        int   anchor_bi    = is_forming ? bar_index + 10 : pat.pD.bi
+        float anchor_price = is_forming ? (pat.prz.top + pat.prz.bot) / 2.0 : pat.pD.price
+        // Style direction: forming labels at PRZ midpoint; others at D pivot
+        bool  label_up = is_forming ? pat.is_bullish : pat.is_bullish
+        new_labels.push(label.new(anchor_bi, anchor_price, pat_txt,
+             style     = label_up ? label.style_label_up : label.style_label_down,
+             color     = label_col,
+             textcolor = color.white,
+             size      = label_size))
+
+    // ── PRZ projection lines (optional, verbose; not for Failed) ───────────────
+    if i_show_projections and not is_failed
+        int proj_transp = is_forming ? 80 : (is_borderline ? 75 : 60)
+        // Forming: anchor projection lines at right edge; Confirmed/Borderline at D
+        int proj_left  = is_forming ? bar_index - 5 : pat.pD.bi - 5
+        int proj_right = is_forming ? bar_index + 10 : pat.pD.bi + 10
+        for i = 0 to pat.prz.projections.size() - 1
+            Projection pr = pat.prz.projections.get(i)
+            color proj_col = pr.in_prz ? color.new(dir_color, proj_transp) : color.new(i_color_warn, proj_transp)
+            new_lines.push(line.new(proj_left, pr.price, proj_right, pr.price,
+                 color=proj_col, style=line.style_dashed, width=1))
+            new_labels.push(label.new(proj_right, pr.price, pr.label,
+                 style=label.style_none, textcolor=proj_col, size=size.tiny))
+
+    // Attach drawing refs to the pattern object
+    pat.lines  := new_lines
+    pat.labels := new_labels
+    pat.boxes  := new_boxes
+    pat
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  MAIN: Pattern Scanning Loop
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  On every new confirmed pivot (not update-in-place), scan all valid 5-pivot
+//  windows in the buffer. For each window, run the Gartley validator. If valid,
+//  build the PRZ, check AB=CD convergence, compute the score, and draw.
+//
+//  Duplicate detection uses (pattern_type, pX.time, pD.time) as the key.
+//  The buffer holds the last 12 pivots, so the scan is trivial (O(buffer_size)).
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var array<HarmonicPattern> patterns_active = array.new<HarmonicPattern>(0)
+
+// ── Diagnostic counters ────────────────────────────────────────────────────────
+// Gartley-specific detailed rejection tracking. The other 5 patterns get
+// acceptance-only counts in the diagnostics table — extending detailed
+// per-gate tracking to all 6 would significantly enlarge the table for
+// limited additional value. Gartley was chosen as the reference because
+// its ideal ratios (B=0.618, D=0.786) are the most widely cited.
+// Bat and Alt Bat get simpler acceptance-only counts (their rejection reasons
+// follow the same taxonomy; detailed breakdown can be added later if needed).
+var int diag_windows_tested   = 0
+var int diag_rej_direction    = 0
+var int diag_rej_structure    = 0
+var int diag_rej_xa_small     = 0
+var int diag_rej_ab           = 0
+var int diag_rej_bc           = 0
+var int diag_rej_cd           = 0
+var int diag_rej_d            = 0
+var int diag_rej_confluence   = 0
+var int diag_rej_score        = 0
+var int diag_accepted         = 0    // Total acceptances (all pattern types) — confirmed only
+var int diag_accepted_gart    = 0
+var int diag_accepted_bat     = 0
+var int diag_accepted_abat    = 0
+var int diag_accepted_bfly    = 0
+var int diag_accepted_crab    = 0
+var int diag_accepted_dcrab   = 0
+var int diag_accepted_borderline = 0   // Borderline patterns (score in [borderline_min, min_score))
+// Forming-mode lifecycle counters
+var int diag_forming_active      = 0   // Currently visible forming patterns
+var int diag_forming_to_confirmed = 0  // Cumulative: forming → confirmed transitions
+var int diag_forming_to_failed   = 0   // Cumulative: forming patterns whose D didn't validate
+var int diag_forming_to_stale    = 0   // Cumulative: forming patterns auto-deleted by decay
+
+// Distribution tracking for candidates that passed structure+XA (status 0 or >=4)
+var float diag_ab_min   = na
+var float diag_ab_max   = na
+var float diag_ab_sum   = 0.0
+var int   diag_ab_count = 0
+var float diag_xd_min   = na
+var float diag_xd_max   = na
+var float diag_xd_sum   = 0.0
+var int   diag_xd_count = 0
+var float diag_ab_best_val = na   // closest r_AB to ideal 0.618
+var float diag_xd_best_val = na   // closest r_XD to ideal 0.786
+
+// ── Alert fire flags (one per pattern × direction) ─────────────────────────────
+// These are bar-scoped booleans driving the 12 named alertcondition() declarations
+// at the bottom of the script. Reset to false every bar; set true inside the
+// winner block when a new pattern of the corresponding type/direction confirms.
+// Note: if multiple patterns confirm on the same bar (different windows), more
+// than one flag may be set — alertcondition() handles that correctly.
+fired_gartley_bull = false
+fired_gartley_bear = false
+fired_bat_bull     = false
+fired_bat_bear     = false
+fired_abat_bull    = false
+fired_abat_bear    = false
+fired_bfly_bull    = false
+fired_bfly_bear    = false
+fired_crab_bull    = false
+fired_crab_bear    = false
+fired_dcrab_bull   = false
+fired_dcrab_bear   = false
+
+if (i_scan_gartley or i_scan_bat or i_scan_alt_bat or i_scan_butterfly or i_scan_crab or i_scan_deep_crab) and new_pivot_added and pivot_buf.size() >= 6
+    // For each valid 5-pivot window (with a 6th pivot confirming D):
+    // window = pivot_buf[start .. start+4], confirmation = pivot_buf[start+5]
+    for start = 0 to pivot_buf.size() - 6
+        Pivot pX = pivot_buf.get(start)
+        Pivot pA = pivot_buf.get(start + 1)
+        Pivot pB = pivot_buf.get(start + 2)
+        Pivot pC = pivot_buf.get(start + 3)
+        Pivot pD = pivot_buf.get(start + 4)
+
+        // Duplicate check — considers ALL pattern types for this window
+        bool duplicate = false
+        if patterns_active.size() > 0
+            for j = 0 to patterns_active.size() - 1
+                HarmonicPattern ex = patterns_active.get(j)
+                if ex.pX.t == pX.t and ex.pD.t == pD.t
+                    duplicate := true
+                    break
+
+        if not duplicate
+            diag_windows_tested := diag_windows_tested + 1
+
+            // ── Run all enabled validators ────────────────────────────────
+            // Each returns [status, bullish, r_AB, r_BC, r_CD, r_XD].
+            // status == 0 means valid; 1-7 are rejection codes.
+            int   g_status = -1
+            bool  g_bullish = false
+            float g_rAB = 0.0, g_rBC = 0.0, g_rCD = 0.0, g_rXD = 0.0
+            if i_scan_gartley
+                [s, b, ab, bc, cd, xd] = f_validate_gartley(pX, pA, pB, pC, pD)
+                g_status := s
+                g_bullish := b
+                g_rAB := ab
+                g_rBC := bc
+                g_rCD := cd
+                g_rXD := xd
+
+            int   b_status = -1
+            bool  b_bullish = false
+            float b_rAB = 0.0, b_rBC = 0.0, b_rCD = 0.0, b_rXD = 0.0
+            if i_scan_bat
+                [s, b, ab, bc, cd, xd] = f_validate_bat(pX, pA, pB, pC, pD)
+                b_status := s
+                b_bullish := b
+                b_rAB := ab
+                b_rBC := bc
+                b_rCD := cd
+                b_rXD := xd
+
+            int   a_status = -1
+            bool  a_bullish = false
+            float a_rAB = 0.0, a_rBC = 0.0, a_rCD = 0.0, a_rXD = 0.0
+            if i_scan_alt_bat
+                [s, b, ab, bc, cd, xd] = f_validate_alt_bat(pX, pA, pB, pC, pD)
+                a_status := s
+                a_bullish := b
+                a_rAB := ab
+                a_rBC := bc
+                a_rCD := cd
+                a_rXD := xd
+
+            int   bf_status = -1
+            bool  bf_bullish = false
+            float bf_rAB = 0.0, bf_rBC = 0.0, bf_rCD = 0.0, bf_rXD = 0.0
+            if i_scan_butterfly
+                [s, b, ab, bc, cd, xd] = f_validate_butterfly(pX, pA, pB, pC, pD)
+                bf_status := s
+                bf_bullish := b
+                bf_rAB := ab
+                bf_rBC := bc
+                bf_rCD := cd
+                bf_rXD := xd
+
+            int   cr_status = -1
+            bool  cr_bullish = false
+            float cr_rAB = 0.0, cr_rBC = 0.0, cr_rCD = 0.0, cr_rXD = 0.0
+            if i_scan_crab
+                [s, b, ab, bc, cd, xd] = f_validate_crab(pX, pA, pB, pC, pD)
+                cr_status := s
+                cr_bullish := b
+                cr_rAB := ab
+                cr_rBC := bc
+                cr_rCD := cd
+                cr_rXD := xd
+
+            int   dc_status = -1
+            bool  dc_bullish = false
+            float dc_rAB = 0.0, dc_rBC = 0.0, dc_rCD = 0.0, dc_rXD = 0.0
+            if i_scan_deep_crab
+                [s, b, ab, bc, cd, xd] = f_validate_deep_crab(pX, pA, pB, pC, pD)
+                dc_status := s
+                dc_bullish := b
+                dc_rAB := ab
+                dc_rBC := bc
+                dc_rCD := cd
+                dc_rXD := xd
+
+            // ── Gartley-specific diagnostic tracking ─────────────────────
+            // Per-gate rejection counters and ratio distribution stats are
+            // tracked using Gartley's status codes only. Bat/Alt Bat/Butterfly/
+            // Crab/Deep Crab get acceptance-only counts in the diagnostics
+            // table to keep the display compact.
+            if g_status >= 0
+                if g_status == 0 or g_status >= 4
+                    diag_ab_min := na(diag_ab_min) ? g_rAB : math.min(diag_ab_min, g_rAB)
+                    diag_ab_max := na(diag_ab_max) ? g_rAB : math.max(diag_ab_max, g_rAB)
+                    diag_ab_sum := diag_ab_sum + g_rAB
+                    diag_ab_count := diag_ab_count + 1
+
+                    diag_xd_min := na(diag_xd_min) ? g_rXD : math.min(diag_xd_min, g_rXD)
+                    diag_xd_max := na(diag_xd_max) ? g_rXD : math.max(diag_xd_max, g_rXD)
+                    diag_xd_sum := diag_xd_sum + g_rXD
+                    diag_xd_count := diag_xd_count + 1
+
+                    if na(diag_ab_best_val) or math.abs(g_rAB - 0.618) < math.abs(diag_ab_best_val - 0.618)
+                        diag_ab_best_val := g_rAB
+                    if na(diag_xd_best_val) or math.abs(g_rXD - 0.786) < math.abs(diag_xd_best_val - 0.786)
+                        diag_xd_best_val := g_rXD
+
+                if g_status == 1
+                    diag_rej_direction := diag_rej_direction + 1
+                else if g_status == 2
+                    diag_rej_structure := diag_rej_structure + 1
+                else if g_status == 3
+                    diag_rej_xa_small := diag_rej_xa_small + 1
+                else if g_status == 4
+                    diag_rej_ab := diag_rej_ab + 1
+                else if g_status == 5
+                    diag_rej_bc := diag_rej_bc + 1
+                else if g_status == 6
+                    diag_rej_cd := diag_rej_cd + 1
+                else if g_status == 7
+                    diag_rej_d := diag_rej_d + 1
+
+            // ── Build PRZ + score for each validator that returned status == 0 ──
+            // Keep the highest-scoring valid match. Priority on ties: Gartley > Bat > Alt Bat.
+            string winner_type  = ""
+            string winner_state = "Confirmed"
+            float  winner_score = -1.0
+            PRZ    winner_prz   = na
+            bool   winner_abcd  = false
+            bool   winner_bull  = false
+            float  winner_rAB   = 0.0
+            float  winner_rBC   = 0.0
+            float  winner_rCD   = 0.0
+            float  winner_rXD   = 0.0
+            int    winner_conf_count = 0
+
+            // Track whether any valid match passed confluence+score gates
+            bool any_rej_confluence = false
+            bool any_rej_score      = false
+
+            // Gartley candidate
+            if g_status == 0
+                PRZ prz = f_build_gartley_prz(pX, pA, pB, pC, g_bullish)
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if pr.label == "AB=CD" and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_gartley(g_rAB, g_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Gartley"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := g_bullish
+                        winner_rAB   := g_rAB
+                        winner_rBC   := g_rBC
+                        winner_rCD   := g_rCD
+                        winner_rXD   := g_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // Bat candidate
+            if b_status == 0
+                PRZ prz = f_build_bat_prz(pX, pA, pB, pC, b_bullish)
+                // AB=CD convergence: either AB=CD or 1.27 AB=CD inside PRZ counts
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if (pr.label == "AB=CD" or pr.label == "1.27 AB=CD") and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_bat(b_rAB, b_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Bat"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := b_bullish
+                        winner_rAB   := b_rAB
+                        winner_rBC   := b_rBC
+                        winner_rCD   := b_rCD
+                        winner_rXD   := b_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // Alt Bat candidate
+            if a_status == 0
+                PRZ prz = f_build_alt_bat_prz(pX, pA, pB, pC, a_bullish)
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if pr.label == "1.27 AB=CD" and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_alt_bat(a_rAB, a_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Alt Bat"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := a_bullish
+                        winner_rAB   := a_rAB
+                        winner_rBC   := a_rBC
+                        winner_rCD   := a_rCD
+                        winner_rXD   := a_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // Butterfly candidate
+            if bf_status == 0
+                PRZ prz = f_build_butterfly_prz(pX, pA, pB, pC, bf_bullish)
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if pr.label == "1.27 AB=CD" and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_butterfly(bf_rAB, bf_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Butterfly"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := bf_bullish
+                        winner_rAB   := bf_rAB
+                        winner_rBC   := bf_rBC
+                        winner_rCD   := bf_rCD
+                        winner_rXD   := bf_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // Crab candidate
+            if cr_status == 0
+                PRZ prz = f_build_crab_prz(pX, pA, pB, pC, cr_bullish)
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if pr.label == "1.27 AB=CD" and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_crab(cr_rAB, cr_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Crab"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := cr_bullish
+                        winner_rAB   := cr_rAB
+                        winner_rBC   := cr_rBC
+                        winner_rCD   := cr_rCD
+                        winner_rXD   := cr_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // Deep Crab candidate (shares PRZ with Crab)
+            if dc_status == 0
+                PRZ prz = f_build_crab_prz(pX, pA, pB, pC, dc_bullish)
+                bool abcd_conv = false
+                for k = 0 to prz.projections.size() - 1
+                    Projection pr = prz.projections.get(k)
+                    if pr.label == "1.27 AB=CD" and pr.in_prz
+                        abcd_conv := true
+                        break
+                if prz.confluence_count < i_min_conf
+                    any_rej_confluence := true
+                else
+                    float sc = f_score_deep_crab(dc_rAB, dc_rXD, prz, abcd_conv)
+                    bool eligible = sc >= i_min_score or (i_show_borderline and sc >= i_borderline_min_score)
+                    if not eligible
+                        any_rej_score := true
+                    else if sc > winner_score
+                        winner_type  := "Deep Crab"
+                        winner_state := sc >= i_min_score ? "Confirmed" : "Borderline"
+                        winner_score := sc
+                        winner_prz   := prz
+                        winner_abcd  := abcd_conv
+                        winner_bull  := dc_bullish
+                        winner_rAB   := dc_rAB
+                        winner_rBC   := dc_rBC
+                        winner_rCD   := dc_rCD
+                        winner_rXD   := dc_rXD
+                        winner_conf_count := prz.confluence_count
+
+            // ── Resolve winner or track gate rejection ────────────────────
+            if winner_type != ""
+                bool is_confirmed_winner = winner_state == "Confirmed"
+
+                if is_confirmed_winner
+                    diag_accepted := diag_accepted + 1
+                    if winner_type == "Gartley"
+                        diag_accepted_gart := diag_accepted_gart + 1
+                    else if winner_type == "Bat"
+                        diag_accepted_bat := diag_accepted_bat + 1
+                    else if winner_type == "Alt Bat"
+                        diag_accepted_abat := diag_accepted_abat + 1
+                    else if winner_type == "Butterfly"
+                        diag_accepted_bfly := diag_accepted_bfly + 1
+                    else if winner_type == "Crab"
+                        diag_accepted_crab := diag_accepted_crab + 1
+                    else if winner_type == "Deep Crab"
+                        diag_accepted_dcrab := diag_accepted_dcrab + 1
+                else
+                    // Borderline patterns get their own counter, not mixed with confirmed
+                    diag_accepted_borderline := diag_accepted_borderline + 1
+
+                HarmonicPattern pat = HarmonicPattern.new(
+                     pattern_type   = winner_type,
+                     is_bullish     = winner_bull,
+                     pX = pX, pA = pA, pB = pB, pC = pC, pD = pD,
+                     prz            = winner_prz,
+                     score          = winner_score,
+                     abcd_converges = winner_abcd,
+                     state          = winner_state,
+                     r_AB = winner_rAB, r_BC = winner_rBC, r_CD = winner_rCD, r_XD = winner_rXD,
+                     lines  = array.new<line>(0),
+                     labels = array.new<label>(0),
+                     boxes  = array.new<box>(0))
+
+                HarmonicPattern drawn = f_draw_pattern(pat)
+                patterns_active.push(drawn)
+
+                // ── Alerts and fired-flags fire ONLY for confirmed patterns ────
+                // Borderline patterns are educational/confluence display only.
+                if is_confirmed_winner
+                    // ── Set fired flag for the matching alertcondition ─────────
+                    if winner_type == "Gartley"
+                        if winner_bull
+                            fired_gartley_bull := true
+                        else
+                            fired_gartley_bear := true
+                    else if winner_type == "Bat"
+                        if winner_bull
+                            fired_bat_bull := true
+                        else
+                            fired_bat_bear := true
+                    else if winner_type == "Alt Bat"
+                        if winner_bull
+                            fired_abat_bull := true
+                        else
+                            fired_abat_bear := true
+                    else if winner_type == "Butterfly"
+                        if winner_bull
+                            fired_bfly_bull := true
+                        else
+                            fired_bfly_bear := true
+                    else if winner_type == "Crab"
+                        if winner_bull
+                            fired_crab_bull := true
+                        else
+                            fired_crab_bear := true
+                    else if winner_type == "Deep Crab"
+                        if winner_bull
+                            fired_dcrab_bull := true
+                        else
+                            fired_dcrab_bear := true
+
+                    // ── Unified alert() with JSON payload ──────────────────────
+                    // Fires once per bar close per pattern that meets min_score.
+                    // Payload format: keys quoted, all values JSON-safe.
+                    if i_enable_alerts and winner_score >= i_alert_min_score
+                        string direction = winner_bull ? "bullish" : "bearish"
+                        string abcd_str  = winner_abcd ? "true" : "false"
+                        string msg = "{" +
+                             "\"ticker\":\"" + syminfo.ticker + "\"," +
+                             "\"tf\":\"" + timeframe.period + "\"," +
+                             "\"pattern\":\"" + winner_type + "\"," +
+                             "\"direction\":\"" + direction + "\"," +
+                             "\"score\":" + str.tostring(winner_score, "#.#") + "," +
+                             "\"abcd_converges\":" + abcd_str + "," +
+                             "\"prz_top\":" + str.tostring(winner_prz.top) + "," +
+                             "\"prz_bot\":" + str.tostring(winner_prz.bot) + "," +
+                             "\"r_AB\":" + str.tostring(winner_rAB, "#.###") + "," +
+                             "\"r_BC\":" + str.tostring(winner_rBC, "#.###") + "," +
+                             "\"r_CD\":" + str.tostring(winner_rCD, "#.###") + "," +
+                             "\"r_XD\":" + str.tostring(winner_rXD, "#.###") + "," +
+                             "\"x_p\":" + str.tostring(pX.price) + ",\"x_t\":" + str.tostring(pX.t) + "," +
+                             "\"a_p\":" + str.tostring(pA.price) + ",\"a_t\":" + str.tostring(pA.t) + "," +
+                             "\"b_p\":" + str.tostring(pB.price) + ",\"b_t\":" + str.tostring(pB.t) + "," +
+                             "\"c_p\":" + str.tostring(pC.price) + ",\"c_t\":" + str.tostring(pC.t) + "," +
+                             "\"d_p\":" + str.tostring(pD.price) + ",\"d_t\":" + str.tostring(pD.t) + "," +
+                             "\"time_fired\":" + str.tostring(time) +
+                             "}"
+                        alert(msg, alert.freq_once_per_bar_close)
+            else if any_rej_score
+                diag_rej_score := diag_rej_score + 1
+            else if any_rej_confluence
+                diag_rej_confluence := diag_rej_confluence + 1
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FORMING MODE LIFECYCLE
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  Three blocks of logic, all gated on i_show_forming:
+//
+//  1. Lifecycle transitions: when a new pivot prints, check if it completes
+//     any existing forming pattern (Forming → Confirmed) or invalidates it
+//     (Forming → Failed).
+//
+//  2. Forming scan loop: identify new forming patterns from windows where the
+//     most recent pivot is C (i.e., XABC complete, D not yet printed).
+//
+//  3. Decay: clean up stale forming patterns (time/distance) and faded failed
+//     patterns. Runs every bar.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if i_show_forming and new_pivot_added and pivot_buf.size() >= 1
+    // ── Block 1: Lifecycle transitions ─────────────────────────────────────────
+    // For each existing forming pattern, check if a pivot newer than C now
+    // exists. If yes, that pivot was the candidate D. Either:
+    //   - The confirmed scan loop above already created a confirmed/borderline
+    //     pattern with same XABC → delete the forming pattern (it was promoted).
+    //   - No confirmed pattern was created → forming → Failed.
+    int idx = 0
+    while idx < patterns_active.size()
+        HarmonicPattern p = patterns_active.get(idx)
+        bool advance = true
+        if p.state == "Forming"
+            // Check if any pivot in buffer is newer than this forming pattern's C
+            bool has_newer_pivot = false
+            for k = 0 to pivot_buf.size() - 1
+                if pivot_buf.get(k).bi > p.pC.bi
+                    has_newer_pivot := true
+                    break
+
+            if has_newer_pivot
+                // Search for a confirmed pattern with same X.t and C.t
+                bool was_promoted = false
+                for j = 0 to patterns_active.size() - 1
+                    HarmonicPattern other = patterns_active.get(j)
+                    if other.state != "Forming" and other.state != "Failed" and
+                       other.pX.t == p.pX.t and other.pC.t == p.pC.t
+                        was_promoted := true
+                        break
+
+                if was_promoted
+                    // Forming → Confirmed (or Borderline). Delete forming drawings.
+                    if not na(p.lines)
+                        while p.lines.size() > 0
+                            line.delete(p.lines.shift())
+                    if not na(p.labels)
+                        while p.labels.size() > 0
+                            label.delete(p.labels.shift())
+                    if not na(p.boxes)
+                        while p.boxes.size() > 0
+                            box.delete(p.boxes.shift())
+                    patterns_active.remove(idx)
+                    diag_forming_to_confirmed := diag_forming_to_confirmed + 1
+                    advance := false
+                else
+                    // Forming → Failed. Update state, redraw with failed visual.
+                    if i_show_failed
+                        // Find candidate D (the first pivot newer than C)
+                        Pivot candidate_d = na
+                        for k = 0 to pivot_buf.size() - 1
+                            if pivot_buf.get(k).bi > p.pC.bi
+                                candidate_d := pivot_buf.get(k)
+                                break
+
+                        // Delete current forming drawings
+                        if not na(p.lines)
+                            while p.lines.size() > 0
+                                line.delete(p.lines.shift())
+                        if not na(p.labels)
+                            while p.labels.size() > 0
+                                label.delete(p.labels.shift())
+                        if not na(p.boxes)
+                            while p.boxes.size() > 0
+                                box.delete(p.boxes.shift())
+
+                        // Update pattern to Failed state
+                        p.pD := candidate_d
+                        p.state := "Failed"
+                        p.failed_at_bar := bar_index
+                        // Redraw with failed visual treatment
+                        HarmonicPattern redrawn = f_draw_pattern(p)
+                        patterns_active.set(idx, redrawn)
+                    else
+                        // i_show_failed off — just delete the forming pattern silently
+                        if not na(p.lines)
+                            while p.lines.size() > 0
+                                line.delete(p.lines.shift())
+                        if not na(p.labels)
+                            while p.labels.size() > 0
+                                label.delete(p.labels.shift())
+                        if not na(p.boxes)
+                            while p.boxes.size() > 0
+                                box.delete(p.boxes.shift())
+                        patterns_active.remove(idx)
+                        advance := false
+                    diag_forming_to_failed := diag_forming_to_failed + 1
+        if advance
+            idx := idx + 1
+
+
+// ── Block 2: Forming scan loop ────────────────────────────────────────────────
+// Iterate 4-pivot windows to identify XABC patterns where D doesn't yet exist.
+// Only consider windows where C is the MOST RECENT pivot in the buffer (so
+// no candidate D pivot exists yet — otherwise the lifecycle block above would
+// handle the transition).
+if i_show_forming and new_pivot_added and pivot_buf.size() >= 4
+    int last_idx = pivot_buf.size() - 1
+    Pivot pX = pivot_buf.get(last_idx - 3)
+    Pivot pA = pivot_buf.get(last_idx - 2)
+    Pivot pB = pivot_buf.get(last_idx - 1)
+    Pivot pC = pivot_buf.get(last_idx)
+
+    // Dedupe: skip if any pattern with this XABC already exists
+    bool dup = false
+    if patterns_active.size() > 0
+        for j = 0 to patterns_active.size() - 1
+            HarmonicPattern ex = patterns_active.get(j)
+            if ex.pX.t == pX.t and ex.pC.t == pC.t
+                dup := true
+                break
+
+    if not dup
+        // Run all enabled forming validators
+        int   gf_status = -1
+        bool  gf_bull   = false
+        float gf_rAB    = 0.0
+        float gf_rBC    = 0.0
+        if i_scan_gartley
+            [s, b, ab, bc] = f_validate_gartley_forming(pX, pA, pB, pC)
+            gf_status := s
+            gf_bull := b
+            gf_rAB := ab
+            gf_rBC := bc
+
+        int   bf_status = -1
+        bool  bf_bull   = false
+        float bf_rAB    = 0.0
+        float bf_rBC    = 0.0
+        if i_scan_bat
+            [s, b, ab, bc] = f_validate_bat_forming(pX, pA, pB, pC)
+            bf_status := s
+            bf_bull := b
+            bf_rAB := ab
+            bf_rBC := bc
+
+        int   af_status = -1
+        bool  af_bull   = false
+        float af_rAB    = 0.0
+        float af_rBC    = 0.0
+        if i_scan_alt_bat
+            [s, b, ab, bc] = f_validate_alt_bat_forming(pX, pA, pB, pC)
+            af_status := s
+            af_bull := b
+            af_rAB := ab
+            af_rBC := bc
+
+        int   bff_status = -1
+        bool  bff_bull   = false
+        float bff_rAB    = 0.0
+        float bff_rBC    = 0.0
+        if i_scan_butterfly
+            [s, b, ab, bc] = f_validate_butterfly_forming(pX, pA, pB, pC)
+            bff_status := s
+            bff_bull := b
+            bff_rAB := ab
+            bff_rBC := bc
+
+        int   cf_status = -1
+        bool  cf_bull   = false
+        float cf_rAB    = 0.0
+        float cf_rBC    = 0.0
+        if i_scan_crab
+            [s, b, ab, bc] = f_validate_crab_forming(pX, pA, pB, pC)
+            cf_status := s
+            cf_bull := b
+            cf_rAB := ab
+            cf_rBC := bc
+
+        int   df_status = -1
+        bool  df_bull   = false
+        float df_rAB    = 0.0
+        float df_rBC    = 0.0
+        if i_scan_deep_crab
+            [s, b, ab, bc] = f_validate_deep_crab_forming(pX, pA, pB, pC)
+            df_status := s
+            df_bull := b
+            df_rAB := ab
+            df_rBC := bc
+
+        // Build PRZ + score for each successful validator. Highest score wins.
+        string fwinner_type  = ""
+        float  fwinner_score = -1.0
+        PRZ    fwinner_prz   = na
+        bool   fwinner_bull  = false
+        float  fwinner_rAB   = 0.0
+        float  fwinner_rBC   = 0.0
+
+        if gf_status == 0
+            PRZ prz = f_build_gartley_prz(pX, pA, pB, pC, gf_bull)
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_gartley_forming(gf_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Gartley"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := gf_bull
+                    fwinner_rAB   := gf_rAB
+                    fwinner_rBC   := gf_rBC
+
+        if bf_status == 0
+            PRZ prz = f_build_bat_prz(pX, pA, pB, pC, bf_bull)
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_bat_forming(bf_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Bat"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := bf_bull
+                    fwinner_rAB   := bf_rAB
+                    fwinner_rBC   := bf_rBC
+
+        if af_status == 0
+            PRZ prz = f_build_alt_bat_prz(pX, pA, pB, pC, af_bull)
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_alt_bat_forming(af_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Alt Bat"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := af_bull
+                    fwinner_rAB   := af_rAB
+                    fwinner_rBC   := af_rBC
+
+        if bff_status == 0
+            PRZ prz = f_build_butterfly_prz(pX, pA, pB, pC, bff_bull)
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_butterfly_forming(bff_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Butterfly"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := bff_bull
+                    fwinner_rAB   := bff_rAB
+                    fwinner_rBC   := bff_rBC
+
+        if cf_status == 0
+            PRZ prz = f_build_crab_prz(pX, pA, pB, pC, cf_bull)
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_crab_forming(cf_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Crab"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := cf_bull
+                    fwinner_rAB   := cf_rAB
+                    fwinner_rBC   := cf_rBC
+
+        if df_status == 0
+            PRZ prz = f_build_crab_prz(pX, pA, pB, pC, df_bull)  // shares PRZ with Crab
+            if prz.confluence_count >= i_min_conf
+                float sc = f_score_deep_crab_forming(df_rAB, prz)
+                if sc >= i_forming_min_score and sc > fwinner_score
+                    fwinner_type  := "Deep Crab"
+                    fwinner_score := sc
+                    fwinner_prz   := prz
+                    fwinner_bull  := df_bull
+                    fwinner_rAB   := df_rAB
+                    fwinner_rBC   := df_rBC
+
+        // If any forming validator yielded a score, create the pattern
+        if fwinner_type != ""
+            HarmonicPattern fpat = HarmonicPattern.new(
+                 pattern_type   = fwinner_type,
+                 is_bullish     = fwinner_bull,
+                 pX = pX, pA = pA, pB = pB, pC = pC,
+                 pD = na,
+                 prz            = fwinner_prz,
+                 score          = fwinner_score,
+                 abcd_converges = false,    // Unknown for forming
+                 state          = "Forming",
+                 r_AB = fwinner_rAB, r_BC = fwinner_rBC, r_CD = 0.0, r_XD = 0.0,
+                 forming_c_bar  = pC.bi,
+                 failed_at_bar  = 0,
+                 lines  = array.new<line>(0),
+                 labels = array.new<label>(0),
+                 boxes  = array.new<box>(0))
+
+            HarmonicPattern fdrawn = f_draw_pattern(fpat)
+            patterns_active.push(fdrawn)
+
+
+// ── Block 3: Decay (runs every bar, not just on new pivots) ───────────────────
+// Time-decay: forming patterns auto-delete after N bars without D.
+// Distance-decay: forming patterns auto-delete if price moves too far in wrong direction.
+// Failed-fadeout: failed patterns delete after length_eff bars.
+if i_show_forming
+    int forming_max = i_forming_max_bars > 0 ? i_forming_max_bars : length_eff * 5
+    int didx = 0
+    while didx < patterns_active.size()
+        HarmonicPattern p = patterns_active.get(didx)
+        bool advance = true
+
+        if p.state == "Forming"
+            // Time decay
+            bool stale_time = bar_index - p.forming_c_bar > forming_max
+
+            // Distance decay: price moved too far in wrong direction from C
+            float dist_threshold = i_forming_max_atr * atr_v
+            bool stale_dist = false
+            if p.is_bullish
+                // Bullish pattern expects price DOWN to PRZ; UP-move beyond C invalidates
+                stale_dist := close > p.pC.price + dist_threshold
+            else
+                // Bearish pattern expects price UP to PRZ; DOWN-move beyond C invalidates
+                stale_dist := close < p.pC.price - dist_threshold
+
+            if stale_time or stale_dist
+                if not na(p.lines)
+                    while p.lines.size() > 0
+                        line.delete(p.lines.shift())
+                if not na(p.labels)
+                    while p.labels.size() > 0
+                        label.delete(p.labels.shift())
+                if not na(p.boxes)
+                    while p.boxes.size() > 0
+                        box.delete(p.boxes.shift())
+                patterns_active.remove(didx)
+                diag_forming_to_stale := diag_forming_to_stale + 1
+                advance := false
+
+        else if p.state == "Failed"
+            // Fade-out: remove failed pattern after length_eff bars
+            if bar_index - p.failed_at_bar > length_eff
+                if not na(p.lines)
+                    while p.lines.size() > 0
+                        line.delete(p.lines.shift())
+                if not na(p.labels)
+                    while p.labels.size() > 0
+                        label.delete(p.labels.shift())
+                if not na(p.boxes)
+                    while p.boxes.size() > 0
+                        box.delete(p.boxes.shift())
+                patterns_active.remove(didx)
+                advance := false
+
+        if advance
+            didx := didx + 1
+
+// Recalculate active forming count (used by diagnostics table)
+diag_forming_active := 0
+if patterns_active.size() > 0
+    for k = 0 to patterns_active.size() - 1
+        if patterns_active.get(k).state == "Forming"
+            diag_forming_active := diag_forming_active + 1
+
+
+// ── Cap array size (FIFO eviction + cleanup of drawing objects) ────────────────
+while patterns_active.size() > i_max_active
+    HarmonicPattern old = patterns_active.shift()
+    if not na(old.lines)
+        while old.lines.size() > 0
+            line.delete(old.lines.shift())
+    if not na(old.labels)
+        while old.labels.size() > 0
+            label.delete(old.labels.shift())
+    if not na(old.boxes)
+        while old.boxes.size() > 0
+            box.delete(old.boxes.shift())
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PIVOT MARKERS  (optional — controlled by Show Pivot Markers toggle)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  These triangle markers visualize ALL detected pivots — not just those
+//  in confirmed patterns. Useful for understanding the zigzag the indicator
+//  uses internally, and for spotting "near miss" patterns where one pivot
+//  fell outside a tolerance band. Toggle off in the Display group if cluttered.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+plotshape(i_show_pivot_markers and not na(piv_h), "Pivot High", shape.triangledown, location.abovebar,
+     color = color.new(color.gray, 30),
+     size  = size.tiny,
+     offset = -length_eff)
+
+plotshape(i_show_pivot_markers and not na(piv_l), "Pivot Low", shape.triangleup, location.belowbar,
+     color = color.new(color.gray, 30),
+     size  = size.tiny,
+     offset = -length_eff)
+
+// ── Diagnostics table (gated on i_show_diagnostics) ───────────────────────────
+// Renders detection statistics in the top-right corner. Off by default.
+// Table is allocated for 29 rows (max size when distribution stats are shown).
+// When distribution toggle is OFF, rows 24-28 simply remain empty — no visible
+// gap because Pine collapses cell-less rows to zero height.
+var table dbg = table.new(position.top_right, 2, 33, border_width=1)
+if barstate.islast and i_show_diagnostics
+    color h_bg = color.new(color.navy, 70)
+    color c_bg = color.new(color.gray, 80)
+    color d_bg = color.new(color.purple, 70)
+    color w    = color.white
+
+    table.cell(dbg, 0,  0, "HAV Diagnostics", bgcolor=h_bg, text_color=w)
+    table.cell(dbg, 1,  0, "",              bgcolor=h_bg, text_color=w)
+
+    table.cell(dbg, 0,  1, "Length (eff)",  bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  1, str.tostring(length_eff), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  2, "Log Scale",     bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  2, use_log ? "ON" : "OFF", bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  3, "Preset",        bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  3, i_preset,        bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  4, "Pivot Buffer",  bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  4, str.tostring(pivot_buf.size()) + " / 12", bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  5, "ATR(" + str.tostring(i_atr_period) + ")", bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  5, str.tostring(atr_v, "#.##"), bgcolor=c_bg, text_color=w)
+
+    // ── Rejection counters ─────────────────────────────────────────────
+    table.cell(dbg, 0,  6, "── Gartley Diagnostics ──", bgcolor=h_bg, text_color=w)
+    table.cell(dbg, 1,  6, "",              bgcolor=h_bg, text_color=w)
+
+    table.cell(dbg, 0,  7, "Windows Tested", bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  7, str.tostring(diag_windows_tested), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  8, "G-Rej: direction",  bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  8, str.tostring(diag_rej_direction), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0,  9, "G-Rej: structure",  bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1,  9, str.tostring(diag_rej_structure), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 10, "G-Rej: XA small",   bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 10, str.tostring(diag_rej_xa_small), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 11, "G-Rej: AB band",    bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 11, str.tostring(diag_rej_ab), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 12, "G-Rej: BC band",    bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 12, str.tostring(diag_rej_bc), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 13, "G-Rej: CD band",    bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 13, str.tostring(diag_rej_cd), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 14, "G-Rej: D band",     bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 14, str.tostring(diag_rej_d), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 15, "Rej: confluence/score", bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 15, str.tostring(diag_rej_confluence) + " / " + str.tostring(diag_rej_score), bgcolor=c_bg, text_color=w)
+
+    // ── Per-pattern acceptance breakdown ───────────────────────────────
+    color acc_bg = color.new(color.green, 60)
+    table.cell(dbg, 0, 16, "Accepted (total)",  bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 16, str.tostring(diag_accepted), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 17, "  ├ Gartley",       bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 17, str.tostring(diag_accepted_gart), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 18, "  ├ Bat",           bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 18, str.tostring(diag_accepted_bat), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 19, "  ├ Alt Bat",       bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 19, str.tostring(diag_accepted_abat), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 20, "  ├ Butterfly",     bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 20, str.tostring(diag_accepted_bfly), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 21, "  ├ Crab",          bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 21, str.tostring(diag_accepted_crab), bgcolor=acc_bg, text_color=w)
+
+    table.cell(dbg, 0, 22, "  └ Deep Crab",     bgcolor=acc_bg, text_color=w)
+    table.cell(dbg, 1, 22, str.tostring(diag_accepted_dcrab), bgcolor=acc_bg, text_color=w)
+
+    color bord_bg = color.new(color.gray, 60)
+    table.cell(dbg, 0, 23, "Borderline (any)", bgcolor=bord_bg, text_color=w)
+    table.cell(dbg, 1, 23, str.tostring(diag_accepted_borderline), bgcolor=bord_bg, text_color=w)
+
+    // ── Forming-mode lifecycle counters (only meaningful when forming is on) ──
+    color form_bg = color.new(color.purple, 75)
+    table.cell(dbg, 0, 24, i_show_forming ? "── Forming Lifecycle ──" : "── Forming (off) ──",
+         bgcolor=form_bg, text_color=w)
+    table.cell(dbg, 1, 24, "", bgcolor=form_bg, text_color=w)
+
+    table.cell(dbg, 0, 25, "Forming (active)", bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 25, str.tostring(diag_forming_active), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 26, "Forming → Confirmed", bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 26, str.tostring(diag_forming_to_confirmed), bgcolor=c_bg, text_color=w)
+
+    table.cell(dbg, 0, 27, "Forming → Failed/Stale",  bgcolor=c_bg, text_color=w)
+    table.cell(dbg, 1, 27, str.tostring(diag_forming_to_failed) + " / " + str.tostring(diag_forming_to_stale),
+         bgcolor=c_bg, text_color=w)
+
+    // ── Ratio distribution for structure-passing candidates (gated on toggle) ──
+    if i_show_distribution
+        table.cell(dbg, 0, 28, "── Distribution ──", bgcolor=d_bg, text_color=w)
+        table.cell(dbg, 1, 28, "",              bgcolor=d_bg, text_color=w)
+
+        string ab_stats = diag_ab_count == 0 ? "n/a" :
+             "min " + str.tostring(diag_ab_min, "#.###") + 
+             " / avg " + str.tostring(diag_ab_sum / diag_ab_count, "#.###") + 
+             " / max " + str.tostring(diag_ab_max, "#.###")
+        table.cell(dbg, 0, 29, "r_AB (ideal 0.618)", bgcolor=c_bg, text_color=w)
+        table.cell(dbg, 1, 29, ab_stats,         bgcolor=c_bg, text_color=w, text_size=size.tiny)
+
+        string xd_stats = diag_xd_count == 0 ? "n/a" :
+             "min " + str.tostring(diag_xd_min, "#.###") + 
+             " / avg " + str.tostring(diag_xd_sum / diag_xd_count, "#.###") + 
+             " / max " + str.tostring(diag_xd_max, "#.###")
+        table.cell(dbg, 0, 30, "r_XD (ideal 0.786)", bgcolor=c_bg, text_color=w)
+        table.cell(dbg, 1, 30, xd_stats,         bgcolor=c_bg, text_color=w, text_size=size.tiny)
+
+        table.cell(dbg, 0, 31, "Samples (struct+XA passed)", bgcolor=c_bg, text_color=w)
+        table.cell(dbg, 1, 31, str.tostring(diag_ab_count), bgcolor=c_bg, text_color=w)
+
+        string best_stats = diag_ab_count == 0 ? "n/a" :
+             "AB=" + str.tostring(diag_ab_best_val, "#.###") + 
+             " (Δ " + str.tostring(math.abs(diag_ab_best_val - 0.618), "#.###") + ")  " +
+             "XD=" + str.tostring(diag_xd_best_val, "#.###") + 
+             " (Δ " + str.tostring(math.abs(diag_xd_best_val - 0.786), "#.###") + ")"
+        table.cell(dbg, 0, 32, "Closest to ideal", bgcolor=color.new(color.orange, 70), text_color=w)
+        table.cell(dbg, 1, 32, best_stats, bgcolor=color.new(color.orange, 70), text_color=w, text_size=size.tiny)
+    else
+        // When toggle is off, explicitly clear distribution rows in case they
+        // were previously populated (handles runtime toggle without script reload).
+        for clr_row = 28 to 32
+            table.cell(dbg, 0, clr_row, "", bgcolor=color.new(color.white, 100))
+            table.cell(dbg, 1, clr_row, "", bgcolor=color.new(color.white, 100))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ALERT CONDITIONS  (12 named alertcondition() — bullish/bearish × 6 patterns)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+//  These give users selective subscription via TradingView's standard alert UI.
+//  The unified alert() call above fires regardless of these (when enabled), but
+//  these let a user pick "only Bat bullish" or "only Crab bearish" directly in
+//  the alert creation dialog without webhook/JSON parsing infrastructure.
+//
+//  Each alertcondition() is constant-time evaluated by Pine on every bar close.
+//  Message strings are kept short — users can customize them in the alert UI.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
+alertcondition(fired_gartley_bull, title="Gartley bullish",
+     message="HAV: Bullish Gartley confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_gartley_bear, title="Gartley bearish",
+     message="HAV: Bearish Gartley confirmed on {{ticker}} {{interval}}")
+
+alertcondition(fired_bat_bull, title="Bat bullish",
+     message="HAV: Bullish Bat confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_bat_bear, title="Bat bearish",
+     message="HAV: Bearish Bat confirmed on {{ticker}} {{interval}}")
+
+alertcondition(fired_abat_bull, title="Alt Bat bullish",
+     message="HAV: Bullish Alt Bat confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_abat_bear, title="Alt Bat bearish",
+     message="HAV: Bearish Alt Bat confirmed on {{ticker}} {{interval}}")
+
+alertcondition(fired_bfly_bull, title="Butterfly bullish",
+     message="HAV: Bullish Butterfly confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_bfly_bear, title="Butterfly bearish",
+     message="HAV: Bearish Butterfly confirmed on {{ticker}} {{interval}}")
+
+alertcondition(fired_crab_bull, title="Crab bullish",
+     message="HAV: Bullish Crab confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_crab_bear, title="Crab bearish",
+     message="HAV: Bearish Crab confirmed on {{ticker}} {{interval}}")
+
+alertcondition(fired_dcrab_bull, title="Deep Crab bullish",
+     message="HAV: Bullish Deep Crab confirmed on {{ticker}} {{interval}}")
+alertcondition(fired_dcrab_bear, title="Deep Crab bearish",
+     message="HAV: Bearish Deep Crab confirmed on {{ticker}} {{interval}}")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  End of Harmonic Auto-Validator [GBB] v1.0
+//
+//  Found a bug, want to suggest a feature, or have a pattern that didn't render
+//  correctly? Open feedback via TradingView's comment system on the script page,
+//  or reach out via The Good, the Bad and the Bitcoin community channels.
+// ═══════════════════════════════════════════════════════════════════════════════
+

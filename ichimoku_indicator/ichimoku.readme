@@ -1,0 +1,200 @@
+The Ichimoku Theories indicator is the most complete Ichimoku tool you will ever need. Four tools combined into one to harness all the power of Ichimoku Kinkō Hyō.
+
+This tool features the following concepts based on the work of Goichi Hosoda:
+
+Ichimoku Kinkō Hyō: Original Ichimoku indicator with its five main lines and kumo.
+Time Theory: automatic time cycle identification and forecasting to understand market timing.
+Wave Theory: automatic wave identification to understand market structure.
+Price Theory: automatic identification of developing N waves and possible price targets to understand future price behavior.
+
+
+🔶 ICHIMOKU KINKŌ HYŌ
+
+snapshot
+
+Ichimoku with lines only, Kumo only and both together
+
+Let us start with the basics: the Ichimoku original indicator is a tool to understand the market, not to predict it, it is a trend-following tool, so it is best used in trending markets.
+
+Ichimoku tells us what is happening in the market and what may happen next, the aim of the tool is to provide market understanding, not trading signals.
+
+The tool is based on calculating the mid-point between the high and low of three pre-defined ranges as the equilibrium price for short (9 periods), medium (26 periods), and long (52 periods) time horizons:
+
+Tenkan sen: middle point of the range of the last 9 candles
+Kinjun sen: middle point of the range of the last 26 candles
+Senkou span A: middle point between Tankan Sen and Kijun Sen, plotted 26 candles into the future
+Senkou span B: midpoint of the range of the last 52 candles, plotted 26 candles into the future
+Chikou span: closing price plotted 26 candles into the past
+Kumo: area between Senkou pans A and B (kumo means cloud in Japanese)
+
+
+The most basic use of the tool is to use the Kumo as an area of possible support or resistance.
+
+🔶 TIME THEORY
+
+snapshot
+
+Current cycles and forecast
+
+Time theory is a critical concept used to identify historical and current market cycles, and use these to forecast the next ones. This concept is based on the Kihon Suchi (translating to "Basic Numbers" in Japanese), these are 9 and 26, and from their combinations we obtain the following sequence:
+
+9, 17, 26, 33, 42, 51, 65, 76, 129, 172, 200, 257
+
+
+The main idea is that the market moves in cycles with periods set by the Kihon Suchi sequence.
+
+When the cycle has the same exact periods, we obtain the Taito Suchi (translating to "Same Number" in Japanese).
+
+This tool allows traders to identify historical and current market cycles and forecast the next one.
+
+🔹 Time Cycle Identification
+
+snapshot
+
+Presentation of 4 different modes: SWINGS, HIGHS, KINJUN, and WAVES.
+
+The tool draws a horizontal line at the bottom of the chart showing the cycles detected and their size.
+
+The following settings are used:
+Time Cycle Mode: up to 7 different modes
+Wave Cycle: Which wave to use when WAVE mode is selected, only active waves in the Wave Theory settings will be used.
+Show Time Cycles: keep a cleaner chart by disabling cycles visualisation
+Show last X time cycles: how many cycles to display
+
+
+🔹 Time Cycle Forecast
+
+snapshot
+
+Showcasing the two forecasting patterns: Kihon Suchi and Taito Suchi
+
+The tool plots horizontal lines, a solid anchor line, and several dotted forecast lines.
+
+The following settings are used:
+Show time cycle forecast: to keep things clean
+Forecast Pattern: comes in two flavors
+Kihon Suchi plots a line from the anchor at each number in the Kihon Suchi sequence.
+Taito Suchi plot lines from the anchor with the same size detected in the anchored cycle
+Anchor forecast on last X time cycle: traders can place the anchor in any detected cycle
+
+
+🔶 WAVE THEORY
+
+snapshot
+
+All waves activated with overlapping
+
+The main idea behind this theory is that markets move like waves in the sea, back and forth (making swing lows and highs). Understanding the current market structure is key to having realistic expectations of what the market may do next. The waves are divided into Simple and Complex.
+
+The following settings are used:
+Basic Waves: allows traders to activate waves I, V and N
+Complex Waves: allows traders to activate waves P, Y and W
+Overlapping waves: to avoid missing out on any of the waves activated
+Show last X waves: how many waves will be displayed
+
+
+🔹 Basic Waves
+
+snapshot
+
+The three basic waves
+
+The basic waves from which all waves are made are I, V, and N
+I wave: one leg moves
+V wave: two legs move, one against the other
+N wave: Three legs move, push, pull back, and another push
+
+
+🔹 Complex Waves
+
+snapshot
+
+Three complex waves
+
+There are other waves like
+P wave: contracting market
+Y wave: expanding market
+W wave: double top or double bottom
+
+
+🔶 PRICE THEORY
+
+snapshot
+
+All targets for the current N wave with their calculations
+
+This theory is based on identifying developing N waves and predicting potential price targets based on that developing wave.
+
+The tool displays 4 basic targets (V, E, N, and NT) and 3 extended targets (2E and 3E) according to the calculations shown in the chart above. Traders can enable or disable each target in the settings panel.
+
+🔶 USING EVERYTHING TOGETHER
+
+snapshot
+
+Please DON'T do this. This is not how you use it
+
+Now the real example:
+snapshot
+
+Daily chart of Nasdaq 100 futures (NQ1!) with our Ichimoku analysis
+
+Time, waves, and price theories go together as one:
+First, we identify the current time cycles and wave structure.
+Then we forecast the next cycle and possible key price levels.
+
+
+We identify a Taito Suchi with both legs of exactly 41 candles on each I wave, both together forming a V wave, the last two I waves are part of a developing N wave, and the time cycle of the first one is 191 candles. We forecast this cycle into the future and get 22nd April as a key date, so in 6 trading days (as of this writing) the market would have completed another Taito Suchi pattern if a new wave and time cycle starts. As we have a developing N wave we can see the potential price targets, the price is actually between the NT and V targets. We have a bullish Kumo and the price is touching it, if this Kumo provides enough support for the price to go further, the market could reach N or E targets.
+
+So we have identified the cycle and wave, our expectations are that the current cycle is another Taito Suchi and the current wave is an N wave, the first I wave went for 191 candles, and we expect the second and third I waves together to amount to 191 candles, so in theory the N wave would complete in the next 6 trading days making a swing high. If this is indeed the case, the price could reach the V target (it is almost there) or even the N target if the bulls have the necessary strength.
+
+We do not predict the future, we can only aim to understand the current market conditions and have future expectations of when (time), how (wave), and where (price) the market will make the next turning point where one side of the market overcomes the other (bulls vs bears).
+
+To generate this chart, we change the following settings from the default ones:
+Swing length: 64
+Show lines: disabled
+Forecast pattern: TAITO SUCHI
+Anchor forecast: 2
+Show last time cycles: 5
+I WAVE: enabled
+N WAVE: disabled
+Show last waves: 5
+
+
+🔶 SETTINGS
+
+Show Swing Highs & Lows: Enable/Disable points on swing highs and swing lows.
+Swing Length: Number of candles to confirm a swing high or swing low. A higher number detects larger swings.
+
+
+🔹 Ichimoku Kinkō Hyō
+
+Show Lines: Enable/Disable the 5 Ichimoku lines: Kijun sen, Tenkan sen, Senkou span A & B and Chikou Span.
+Show Kumo: Enable/Disable the Kumo (cloud). The Kumo is formed by 2 lines: Senkou Span A and Senkou Span B.
+Tenkan Sen Length: Number of candles for Tenkan Sen calculation.
+Kinjun Sen Length: Number of candles for the Kijun Sen calculation.
+Senkou Span B Length: Number of candles for Senkou Span B calculation.
+Chikou & Senkou Offset: Number of candles for Chikou and Senkou Span calculation. Chikou Span is plotted in the past, and Senkou Span A & B in the future.
+
+🔹 Time Theory
+
+Show Time Cycle Forecast: Enable/Disable time cycle forecast vertical lines. Disable for better performance.
+Forecast Pattern: Choose between two patterns: Kihon Suchi (basic numbers) or Taito Suchi (equal numbers).
+Anchor forecast on last X time cycle: Number of time cycles in the past to anchor the time cycle forecast. The larger the number, the deeper in the past the anchor will be.
+Time Cycle Mode: Choose from 7 time cycle detection modes: Tenkan Sen cross, Kijun Sen cross, Kumo change between bullish & bearish, swing highs only, swing lows only, both swing highs & lows and wave detection.
+Wave Cycle: Choose which type of wave to detect from 6 different wave types when the time cycle mode is set to WAVES.
+Show Time Cycles: Enable/Disable time cycle horizontal lines. Disable for better performance.
+how last X time cycles: Maximum number of time cycles to display.
+
+
+🔹 Wave Theory
+
+Basic Waves: Enable/Disable the display of basic waves, all at once or one at a time. Disable for better performance.
+Complex Waves: Enable/Disable complex wave display, all at once or one by one. Disable for better performance.
+Overlapping Waves: Enable/Disable the display of waves ending on the same swing point.
+Show last X waves: 'Maximum number of waves to display.
+
+
+🔹 Price Theory
+
+Basic Targets: Enable/Disable horizontal price target lines. Disable for better performance.
+Extended Targets: Enable/Disable extended price target horizontal lines. Disable for better performance.

@@ -1,0 +1,417 @@
+📐 Fibonacci Structure Engine is an overlay indicator that combines automatic Fibonacci retracement from live market structure with Smart Money Concepts (BOS/CHoCH detection), weighted confluence scoring, premium/discount zone classification, and context-filtered engulfing pattern entries — creating a complete structure-to-Fibonacci-to-entry workflow where every component feeds into the next.
+
+The core idea: Fibonacci levels are only meaningful when drawn from the correct swing points. This indicator automates the entire process: it detects swing highs/lows with ATR-filtered pivot detection, identifies structure breaks (BOS) and trend reversals (CHoCH), anchors Fibonacci retracement levels from the structure-defined swing, trails the live edge as price extends, locks it when a confirmed pivot arrives, scores the confluence between current price and Fibonacci levels, and generates entry signals when engulfing patterns occur at high-confluence zones in the correct structural context.
+
+Most Fibonacci tools on TradingView require manual drawing — you select the swing high and low, and the levels appear. The problem: selecting the wrong swing, forgetting to update after a new structure break, or drawing from a minor swing that doesn't reflect the current trend leg. This indicator solves all three: the Fibonacci anchors update automatically on every structure break, trail the live edge as price extends, and lock when a confirmed pivot arrives — always reflecting the most relevant swing for the current market structure.
+
+
+🧩 WHY THESE COMPONENTS WORK TOGETHER
+
+Fibonacci retracement levels alone are static S/R lines. Structure detection alone tells you trend direction. Engulfing patterns alone fire everywhere. Confluence scoring alone has nothing to score against.
+
+This indicator chains them into a dependency pipeline:
+
+ATR-filtered swing detection → HH/HL/LH/LL classification → BOS/CHoCH structure breaks → Fibonacci anchor from structure swing → Live edge trailing + pivot locking → Fib level calculation → Confluence scoring (price vs Fib levels) → Premium/Discount zone classification → Engulfing pattern detection in structural context → Entry signal with cooldown
+
+The swing detection feeds the structure engine — without confirmed pivots, no BOS/CHoCH can fire. The structure breaks anchor the Fibonacci levels — without a break, there's no swing to draw from. The Fibonacci levels feed the confluence scorer — without levels, there's nothing to score proximity against. The confluence score plus the premium/discount zone filter the engulfing patterns — without context, engulfing patterns produce too many false entries. And the signal cooldown prevents clustering from this entire chain.
+
+Removing the structure detection breaks the Fibonacci anchoring. Removing the ATR filter floods the structure with noise swings. Removing the confluence scoring allows entries at non-Fibonacci prices. Removing the premium/discount filter allows bullish entries in premium (where sells should occur). Each component eliminates a specific failure mode.
+
+
+🔍 WHAT MAKES IT ORIGINAL
+
+1️⃣ Structure-anchored Fibonacci with live edge trailing.
+The Fibonacci engine uses a 4-phase lifecycle:
+
+Phase 1 — Anchor on structure break: When a BOS or CHoCH is detected:
+— Bullish break: top = current high (live, will trail), bottom = most recent swing low (locked)
+— Bearish break: bottom = current low (live, will trail), top = most recent swing high (locked)
+This instantly draws Fibonacci levels from the break point.
+
+Phase 2 — Trail live edge: As price extends beyond the initial break, the live edge (top for bull, bottom for bear) updates to the new extreme. Fibonacci levels recalculate continuously to reflect the current move. This captures the full extent of the breakout without waiting for a pivot confirmation.
+
+Phase 3 — Lock on pivot: When a confirmed swing high (for bullish trailing) or swing low (for bearish trailing) is detected by the pivot engine, the live edge locks to that confirmed pivot. The Fibonacci levels stop updating and represent the confirmed swing range.
+
+Phase 4 — Update on new swings: When a new confirmed swing arrives that differs from the current locked anchor, the Fibonacci levels update to the new structure — always reflecting the most recent confirmed swing.
+
+This lifecycle means the Fibonacci levels are always relevant: immediately reactive after a break (phases 1–2), then structurally confirmed once a pivot is detected (phases 3–4).
+
+2️⃣ ATR-filtered pivot detection with noise suppression.
+Standard ta.pivothigh/ta.pivotlow detects every local extreme, including minor fluctuations that don't represent real swing points. The ATR filter requires:
+— For a swing high: the distance from the pivot high to the most recent swing low ≥ ATR × multiplier (default 0.5)
+— For a swing low: the distance from the most recent swing high to the pivot low ≥ ATR × multiplier
+
+This ensures only swings of meaningful size (relative to current volatility) are used for structure detection and Fibonacci anchoring. The multiplier is configurable: lower (0.2–0.3) for more granular structure, higher (0.8–1.0) for only major swings.
+
+3️⃣ BOS / CHoCH structure detection with bias tracking.
+The indicator tracks a persistent structureBias variable (+1 bullish, −1 bearish, 0 neutral):
+— BOS (Break of Structure): close breaks above the most recent swing high while bias is already bullish (or below swing low while already bearish) — trend continuation
+— CHoCH (Change of Character): close breaks above swing high while bias was bearish, or below swing low while bias was bullish — trend reversal
+
+Each break requires: barstate.isconfirmed + the swing level hasn't been broken before (tracked via lastBrokenHigh/lastBrokenLow). Structure lines are drawn from the swing point to the break bar with configurable style (solid/dashed/dotted) and width.
+
+4️⃣ Weighted confluence scoring (0–100).
+The indicator measures how close the current price is to each Fibonacci level (within ATR × tolerance) and assigns weights by Fib importance:
+
+— 0.236 → weight 1.0 (minor level)
+— 0.382 → weight 1.5 (shallow retracement)
+— 0.500 → weight 2.0 (equilibrium)
+— 0.618 → weight 2.5 (golden ratio — highest weight)
+— 0.786 → weight 1.5 (deep retracement)
+
+Swing highs/lows within tolerance add +1.0 each. Total weight × 10 = confluence score (capped at 100). Classification: Strong (≥ 60), Moderate (≥ 30), Weak (> 0), None (0).
+
+The tolerance is ATR-based (default 0.3× ATR) — on a volatile instrument, the "near" zone expands proportionally. On a quiet instrument, it tightens. This prevents false confluence readings from both too-tight and too-loose proximity checks.
+
+5️⃣ Premium / Discount zone classification.
+Using the 0.500 Fibonacci level as the equilibrium:
+— Premium: close > Fib 0.500 — price is above equilibrium (expensive relative to the swing)
+— Discount: close ≤ Fib 0.500 — price is below equilibrium (cheap relative to the swing)
+
+This classification is used as a context filter for engulfing patterns: bullish engulfing patterns are only marked when price is in discount or at a confluence zone. Bearish engulfing patterns are only marked in premium or at a confluence zone. This prevents the most common engulfing failure mode: bullish patterns at the top of a range and bearish patterns at the bottom.
+
+6️⃣ Context-filtered engulfing pattern detection.
+The engulfing pattern detection requires:
+— Current candle body > EMA(body, 14) — above-average body size (not a doji)
+— Previous candle body < EMA(body, 14) — smaller previous candle (setup for engulf)
+— Current candle fully engulfs previous candle's body
+— Context filter: in premium/discount zone OR confluence weight ≥ 1.5
+
+Bearish engulfing (▼): marked when price is in premium or near a Fib level — a reversal pattern at resistance. Bullish engulfing (▲): marked when price is in discount or near a Fib level — a reversal pattern at support.
+
+7️⃣ Dual-path entry signals with cooldown.
+Two entry paths:
+— Engulfing + Structure + Confluence: engulfing pattern in context + structure bias aligned + confluence weight ≥ 1.5
+— CHoCH (trend reversal): any confirmed CHoCH — strong reversal signal, no additional confluence required
+
+Both paths subject to signal cooldown (default 5 bars) to prevent clustering. Buy/Sell signals are displayed as labels (off by default — enable in Visual Settings).
+
+8️⃣ Golden Zone + Target Zone visualization.
+Two highlighted zones drawn as semi-transparent boxes:
+— Golden Zone (0.500 – 0.786): the highest-probability retracement area. Where most retests find support/resistance.
+— Target Zone (−0.500 – −0.618): the Fibonacci extension target for the next leg. Where price typically reaches after a confirmed retracement entry.
+
+Both zones extend rightward by the configurable extension (default 20 bars) and update with Fibonacci level changes.
+
+9️⃣ Seven configurable Fibonacci levels.
+Individually toggleable: 0.236, 0.382, 0.500, 0.618, 0.786, −0.500, and Target (−0.618). Each drawn with distinct line styles — 0.618 is the thickest and most opaque (golden ratio emphasis), 0.236 is the thinnest (minor level). A dotted reference line connects the swing low to swing high showing the measured move.
+
+
+⚙️ HOW IT WORKS — CALCULATION FLOW
+
+Step 1 — Pivot detection: ta.pivothigh/ta.pivotlow with configurable lookback. ATR filter removes minor swings (swing size must exceed ATR × multiplier).
+
+Step 2 — Swing tracking: Most recent two swing highs and two swing lows stored with bar indices. Each new swing is compared to previous → HH/HL/LH/LL classification.
+
+Step 3 — Structure detection: Close breaks above swing high → BOS (if bias already bullish) or CHoCH (if bias was bearish). Same logic inverted for bearish breaks. Structure bias updated.
+
+Step 4 — Fibonacci anchoring: On break → live edge set at current extreme, locked edge at swing. Live edge trails with price. Locks when confirmed pivot arrives. Updates on new swings.
+
+Step 5 — Level calculation: fibLevel = swingHigh − (swingHigh − swingLow) × ratio for each ratio. Extension targets use negative ratios.
+
+Step 6 — Confluence scoring: For each Fib level, check if |close − level| ≤ ATR × tolerance. Add weighted score. Include swing level proximity. Cap at 100.
+
+Step 7 — Entry logic: Path A: engulfing in context + bias + confluence ≥ 1.5. Path B: CHoCH. Both respect cooldown.
+
+
+📖 HOW TO USE
+
+🎯 Quick start:
+1. Add the indicator — Fibonacci levels and structure labels appear automatically
+2. HH/HL/LH/LL labels show market structure
+3. BOS/CHoCH labels show structure breaks and reversals
+4. Yellow-shaded Golden Zone (0.500–0.786) = highest-probability retracement area
+5. ▲/▼ arrows = engulfing patterns in structural context
+6. Enable Buy/Sell Signals in Visual Settings for entry labels
+
+👁️ Reading the chart:
+— 🟢 HH / HL labels = bullish structure (higher highs, higher lows)
+— 🔴 LH / LL labels = bearish structure (lower highs, lower lows)
+— 🟢 "BOS" line + label = bullish break of structure (continuation)
+— 🔴 "BOS" line + label = bearish break of structure
+— 🟢🔴 "CHoCH" = Change of Character (trend reversal)
+— 🔵 Horizontal lines = Fibonacci levels (0.236–0.786)
+— 🟡 Shaded box (upper) = Golden Zone (0.500–0.786)
+— 🟡 Shaded box (lower) = Target Zone (−0.500 to −0.618)
+— 🟢 ▲ = bullish engulfing in discount / Fib zone
+— 🔴 ▼ = bearish engulfing in premium / Fib zone
+— 🟢 "BUY" / 🔴 "SELL" = confirmed entry signals (when enabled)
+
+🔧 Tuning guide:
+— Too many structure labels: increase Swing Length (12–20) or increase ATR Multiplier (0.7–1.0)
+— Missing swings: decrease Swing Length (5–8) or decrease ATR Multiplier (0.2–0.3)
+— Confluence too strict: increase Confluence ATR Tolerance (0.4–0.5)
+— Too many engulfing signals: they self-filter by premium/discount — increase ATR Filter to reduce swing count
+— Signal clustering: increase Signal Cooldown (8–15 bars)
+
+
+⚙️ KEY SETTINGS REFERENCE
+
+⚙️ Main:
+— Swing Detection Length (default 10): pivot lookback — higher = larger swings
+— ATR Swing Filter (default On): minimum swing size as ATR multiple
+— ATR Filter Multiplier (default 0.5): how large swings must be
+— Signal Cooldown (default 5): bars between consecutive signals
+
+📐 Fibonacci:
+— Show Fibonacci Levels (default On)
+— Fib Extension Bars (default 20): rightward line extension
+— Individual level toggles: 0.236 (off), 0.382, 0.500, 0.618, 0.786, −0.5, Target −0.618
+— Confluence ATR Tolerance (default 0.3): proximity threshold
+
+🏗️ Structure:
+— BOS / CHoCH (default On): show structure break lines and labels
+— Swing Labels (default On): HH/HL/LH/LL on pivots
+— Engulfing Signals (default On): context-filtered patterns
+
+🎨 Visual:
+— Buy/Sell Signals (default Off): enable for entry labels
+— Structure line style (Solid/Dashed/Dotted) and width (1–4)
+— Auto / Dark / Light theme
+
+
+🔔 Alerts
+
+— 🟢 BUY / 🔴 SELL — ticker, price, TF, confluence score, SL, TP
+— 🔵 BOS — structure break with direction
+— 🟡 CHoCH — trend reversal with direction
+All support plain text and JSON webhook format. Bar-close confirmed.
+
+
+⚠️ IMPORTANT NOTES
+
+— 🚫 No repainting. All structure breaks and signals require barstate.isconfirmed. Pivot detection uses equal left/right lookback (swingLen/swingLen) — pivots are confirmed swingLen bars after the actual high/low. Fibonacci levels update on confirmed pivots and structure breaks only.
+— 📐 The Fibonacci anchor system has two states per edge: live and locked. A live edge trails with price (capturing the full move after a break). A locked edge is confirmed by a pivot. You'll see the Fibonacci levels shift on bar close as the live edge updates — this is by design, not repainting. Once the pivot locks, levels stabilize.
+— ⚖️ The 0.618 level carries the highest confluence weight (2.5) because it is the golden ratio — the most statistically significant Fibonacci retracement level. The 0.500 carries weight 2.0, while the extreme levels (0.236, 0.786) carry 1.0–1.5.
+— 📊 Buy/Sell signals are off by default. The indicator is designed primarily as a structure + Fibonacci analysis tool. Enable signals in Visual Settings when you want automated entry detection.
+— 🔄 CHoCH signals do not require confluence — they represent a structural trend reversal, which is inherently a high-conviction event. Engulfing-based entries require confluence weight ≥ 1.5 + correct structural bias.
+— 📏 The Golden Zone (0.500–0.786) is the area where most successful retests occur. The Target Zone (−0.500 to −0.618) is the area where the next impulse leg typically reaches. Both are highlighted with semi-transparent boxes.
+— 🛠️ This is a structure analysis and Fibonacci visualization tool, not an automated trading bot. It maps market structure, draws Fibonacci levels, scores confluence, and identifies high-probability entry zones — trade decisions remain yours.
+— 🌐 Works on all markets and timeframes.
+Mar 27
+Release Notes
+🔄 Direction-Aware Fibonacci Levels
+Fibonacci retracement and extension levels now flip based on the last CHoCH direction:
+— After a bullish CHoCH: retracement draws from top to bottom (pullback into support), targets point upward (−0.618 above swing high)
+— After a bearish CHoCH: retracement inverts from bottom to top, targets point downward below swing low
+— Target labels show directional arrows: "Target ↑" / "Target ↓" and "−0.5 ↑" / "−0.5 ↓"
+— Target zone box color matches direction: green for bullish, red for bearish
+Previously all Fib levels were calculated identically regardless of trend — now they adapt to the structural context
+⚖️ Direction-Aware Premium / Discount Zones
+Premium and Discount classification now respects the Fib direction:
+— Bullish structure: above 0.500 = Premium (expensive), below = Discount (cheap — look for buys)
+— Bearish structure: inverted — below 0.500 = Premium, above = Discount
+This ensures engulfing pattern context filtering works correctly in both trend directions
+📊 New Dashboard Row — Fib Direction
+Dashboard now displays "Fib Dir" showing "Long ↑" or "Short ↓" based on the last CHoCH — always clear which direction targets are pointing
+🔒 Simultaneous Break Conflict Resolution
+Added explicit handling for the rare edge case where both bullish and bearish structure breaks trigger on the same bar. CHoCH is now prioritized over BOS: if both fire, the trend-reversing break takes priority
+🔧 Minor Improvements
+— Fib levels explicitly reset to na when range becomes invalid — no stale levels persisting
+— Golden zone and target zone boxes use safe coordinate ordering (math.max/min) for correct rendering in both directions
+— ATR filter calculation optimized — computed once outside pivot blocks
+— Dashboard header and shorttitle compacted to "FibStruct"
+Apr 8
+Release Notes
+💧 New: Liquidity Engine
+
+🆕 Equal Highs / Equal Lows (EQH/EQL) Detection
+Automatically identifies resting liquidity zones where price has tested the same level twice. Dashed purple lines mark these zones so you can see exactly where stop hunts are likely to occur.
+🆕 Liquidity Sweep Detection
+Catches the classic wick-through-and-reject pattern — where price pierces a swing high/low or EQH/EQL with a wick but closes back inside. Marked with an orange ✗ above/below the bar. These are high-probability reversal tells.
+🆕 Auto-Trimming Sweep Visualization
+When a sweep consumes an EQH/EQL, the line automatically trims to the sweep bar and fades out. You can literally see where the liquidity was taken — super clean visual storytelling.
+🆕 Sweep-Boosted Confluence
+Liquidity sweeps now add weight to the confluence score. A sweep in a Fib golden zone = very strong signal.
+🆕 Sweep-Triggered Signals
+BUY/SELL signals can now fire directly on liquidity sweeps when price is in Discount/Premium or confluence is strong enough.
+🆕 Liquidity Alerts
+New alert conditions for SWEEP HIGH and SWEEP LOW — both text and JSON webhook formats.
+
+🎨 New Dashboard Row
+🆕 Liquidity Status
+Dashboard now shows active EQH/EQL state at a glance (EQH ↑ / EQL ↓ / EQH+EQL / —).
+
+⚙️ New Settings
+
+💧 EQ ATR Tolerance — how strict the "equal" definition is (default 0.1 ATR)
+💧 EQ Line Extension — local line length in bars (default 50)
+💧 Show EQH / EQL — toggle on/off
+💧 Show Liquidity Sweeps — toggle sweep detection
+💧 Sweeps Boost Confluence — toggle sweep weight contribution
+🎨 EQH/EQL Color — customize liquidity line color
+🎨 Sweep Color — customize sweep marker color
+
+
+🐛 Bug Fixes
+
+🔴 Fixed: Sweep detection firing repeatedly on the same level
+Previously, when price chopped around a swing level, every bar with a wick-through triggered a new sweep signal. Now each level can only be swept once, tracked by bar index.
+🔴 Fixed: Stale drawing references after Fib redraw
+After Fibonacci levels were deleted on a new structure break, references to freed objects persisted — potentially causing incorrect extensions. All refs now properly reset to na after cleanup.
+🟡 Fixed: Confluence missed wick-touches of Fib levels
+The confluence engine only checked if close was near a level, ignoring wick tests. Now a wick piercing a Fib level correctly counts as confluence — much more accurate detection of rejection zones.
+🟡 Fixed: Engulfing pattern allowed smaller bodies
+Strict engulfing now requires the current body to be explicitly larger than the previous body (body > body[1]), not just larger than average. Reduces false engulfing signals in choppy conditions.
+🟡 Fixed: Structure re-break detection edge case
+Broken swing levels are now tracked by bar index instead of price value. Previously, if a new swing formed at an identical price to a recently-broken one (common on crypto during consolidation), the valid re-break could be missed.
+🟢 Fixed: Engulfing warmup fallback bug
+The isSmallPrev check had an incorrect fallback that made the condition nearly always true during warmup bars. Now uses proper EMA fallback.
+🟢 Fixed: EQ tolerance during warmup
+Guarded eqTolerance calculation against zero ATR values to prevent false EQH/EQL detection on the first bars.
+
+🎯 What This Means for Your Trading
+
+This update transforms FibStruct from a pure structure+Fib tool into a full Smart Money Concepts engine. You now get:
+✅ Visible liquidity pools (EQH/EQL)
+✅ Liquidity sweep detection (stop hunts)
+✅ Sweep + Fib golden zone confluence
+✅ Cleaner, more accurate confluence scoring
+✅ Fewer false engulfing signals
+✅ More reliable structure break tracking
+The sweep detection alone is a massive edge — these wick-rejection patterns at liquidity pools are where smart money enters, and now you'll see them in real-time with full confluence context.
+
+💡 Pro Tip: Try pairing sweep signals with the Fib 0.618 golden zone — when a sweep occurs inside or near the golden zone, confluence jumps to "Strong" and win rate historically improves dramatically.
+🔔 Remember: Old alerts will continue to work. New SWEEP HIGH / SWEEP LOW alerts need to be added manually if you want them.
+Happy trading! 📈
+Apr 27
+Release Notes
+═══════════════════════════════════════════════
+FIBONACCI STRUCTURE ENGINE — v1.5.2 RELEASE
+═══════════════════════════════════════════════
+
+A complete overhaul of the signal engine with focus
+on accuracy, transparency, and bot-friendly alerts.
+
+───────────────────────────────────────────────
+🆕 NEW FEATURES
+───────────────────────────────────────────────
+
+▸ TRIGGER REASON IN ALERTS
+Every BUY/SELL alert now includes a "trigger"
+field showing exactly what fired the signal:
+• "choch" — structure flip
+• "sweep" — liquidity grab
+• "engulf" — engulfing pattern
+• "choch+sweep" — combo (highest quality)
+
+Text alerts: 🟢 BUY [choch+sweep] | BTCUSDT ...
+JSON alerts: {"trigger":"choch+sweep", ...}
+
+Lets your bot route A-tier vs B-tier setups
+to different position sizes or strategies.
+
+▸ DASHBOARD UPGRADES
+• ATR(14) row — for instant SL/TP sizing
+• Near Fib row — closest level + distance
+in ATR units, highlighted yellow when
+price enters the confluence zone
+
+▸ STRICT ENGULFING TOGGLE
+Choose your candle pattern semantics:
+• STRICT (default) — classic engulfing,
+both body bounds strictly exceed prev
+• LOOSE — pre-v1.5 behavior, more signals
+
+───────────────────────────────────────────────
+🔧 BUG FIXES
+───────────────────────────────────────────────
+
+▸ EQH / EQL SWEEP ANCHOR
+Fixed a copy-paste bug where EQH/EQL re-sweep
+tracking used the wrong index, causing some
+valid sweeps to be silently ignored.
+
+▸ DIRECTION FLIP RESET
+Swept-level trackers now reset on CHoCH.
+Old levels become valid re-sweep targets
+in the new market context — no more stale
+blocks after a trend reversal.
+
+▸ UNIFIED COOLDOWN
+Buy and Sell now share a single cooldown
+counter. Eliminates buy↔sell ping-pong on
+choppy price action.
+
+▸ MUTUAL EXCLUSION
+If both bullish and bearish setups fire on
+the same bar, both are cancelled. Contradictory
+signals = noise, not opportunity.
+
+▸ WARMUP GATE
+Extended startup protection across all
+ATR-dependent calculations. No more spurious
+signals in the first 50 bars.
+
+▸ STRICTER ENGULFING SEMANTICS
+Default behavior now requires both body bounds
+to strictly exceed the previous candle's body.
+Filters out edge cases that aren't true
+engulfing patterns.
+
+───────────────────────────────────────────────
+📋 ALERT JSON SCHEMA
+───────────────────────────────────────────────
+
+BUY/SELL signals:
+{
+"action": "buy" | "sell",
+"ticker": "BTCUSDT",
+"price": 67234.5,
+"tf": "15",
+"trigger": "choch+sweep",
+"confluence": 75,
+"sl": 66890.2,
+"tp": 67925.8
+}
+
+Structure events (BOS / CHoCH / Sweep):
+{
+"action": "bos" | "choch" | "sweep",
+"ticker": "BTCUSDT",
+"price": 67234.5,
+"direction": "bull" | "bear" | "high" | "low"
+}
+
+───────────────────────────────────────────────
+⚙️ RECOMMENDED SETTINGS
+───────────────────────────────────────────────
+
+Day trading (5m–15m):
+• Swing Length: 8–10
+• ATR Multiplier: 0.5
+• Cooldown: 5 bars
+• Strict Engulfing: ON
+
+Swing trading (1H–4H):
+• Swing Length: 12–15
+• ATR Multiplier: 0.7
+• Cooldown: 3 bars
+• Strict Engulfing: ON
+
+Scalping (1m–3m):
+• Swing Length: 6–8
+• ATR Multiplier: 0.3
+• Cooldown: 8 bars
+• Strict Engulfing: OFF (more signals)
+
+───────────────────────────────────────────────
+💡 TIPS
+───────────────────────────────────────────────
+
+• Filter alerts by "trigger" field — combo
+setups (choch+sweep) statistically outperform
+single-trigger signals.
+
+• The "Near Fib" dashboard row turns yellow
+when price is within your confluence
+tolerance — a visual confirmation that
+you're in a high-probability entry zone.
+
+• EQH/EQL lines auto-trim at the sweep bar
+and fade to indicate consumed liquidity.
+Active (un-swept) lines remain bold.
+
+═══════════════════════════════════════════════
+Built by WillyAlgoTrader
+═══════════════════════════════════════════════

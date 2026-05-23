@@ -1,0 +1,231 @@
+# TV Indicator Crew — task graph
+#
+# Parallelism: the five analyst tasks set async_execution: true. CrewAI's
+# sequential process fires them concurrently, then synthesize_tv_task blocks
+# until all five complete.
+#
+# Wall-clock cost ≈ max(5 analyst times) + synthesis time.
+#
+# Variables injected at kickoff via additional_context:
+#   topic          — ticker, e.g. "AAPL"  (also {topic} in agent goal/backstory)
+#   timeframe      — "4h" | "day" | "week" | "month"
+#   current_date   — ISO date, e.g. "2026-05-23"
+#   mcpe_brief     — pre-formatted MCPE data brief (from TV MCP)
+#   harmonic_brief — pre-formatted HAV data brief
+#   ichimoku_brief — pre-formatted Ichimoku data brief
+#   fibstruct_brief— pre-formatted FibStruct data brief
+#   demark_brief   — pre-formatted TD Sequential data brief
+
+analyze_mcpe:
+  description: >
+    Analyze the MCPE (Market Cycle Projection Engine) brief for ${topic}
+    on the {timeframe} timeframe as of {current_date}.
+
+    The brief is:
+    {mcpe_brief}
+
+    Using your Wyckoff cycle methodology, answer:
+    1. What phase is the market in right now, and what does it mean for
+       direction?
+    2. What is the cycle position % reading and which zone is it in
+       (< 30% accumulation, 30–70% continuation, > 70% distribution)?
+    3. Is there an active projection arrow? If so, what direction and
+       what is the projected target price?
+    4. What are the Cycle High, Mid, and Low levels, and which is most
+       relevant for entry/stop placement?
+    5. What does the volatility state (HIGH or NORMAL) tell you about
+       signal confidence?
+    6. BOTTOM LINE: Is MCPE signaling a trade (and in which direction),
+       or is it neutral/inconclusive? Say "no signal" explicitly if so.
+  expected_output: >
+    A markdown section titled "## MCPE Verdict — Wyckoff Cycle" containing:
+    - One-line directional call (bullish / bearish / neutral) with confidence
+    - Cycle phase + position % interpretation
+    - Projection assessment (active and valid, or absent/stale)
+    - Key levels relevant to entry and stop
+    - Volatility context
+    - One explicit statement: "MCPE SIGNALS: <direction>" or "MCPE: NO SIGNAL"
+    Maximum ~200 words.
+  agent: mcpe_analyst
+  async_execution: true
+
+analyze_harmonic:
+  description: >
+    Analyze the HAV (Harmonic Auto-Validator) brief for ${topic}
+    on the {timeframe} timeframe as of {current_date}.
+
+    The brief is:
+    {harmonic_brief}
+
+    Using your harmonic pattern methodology, answer:
+    1. Are there any confirmed patterns (score ≥ 6)? List type, direction,
+       score, and AB=CD convergence status.
+    2. For each confirmed pattern, where is the PRZ zone ($low – $high)?
+       Is price currently approaching, inside, or through the PRZ?
+    3. What does the pattern type and score imply about entry quality
+       (textbook ≥ 8, tradeable 6–7.9, borderline 4–5.9)?
+    4. If no confirmed patterns exist, state clearly that harmonic analysis
+       provides no signal on this timeframe.
+    5. BOTTOM LINE: Is HAV signaling a trade? In which direction?
+       Which PRZ level is the actionable entry zone?
+  expected_output: >
+    A markdown section titled "## Harmonic Verdict" containing:
+    - Summary of confirmed patterns (or "No confirmed harmonic patterns")
+    - For each pattern: type, direction, score, AB=CD status, PRZ zone,
+      price relationship to PRZ
+    - Entry implication (approach limit at PRZ, wait for rejection inside PRZ,
+      or skip if through PRZ)
+    - One explicit statement: "HAV SIGNALS: <Bullish/Bearish> entry at PRZ
+      $X–$Y" or "HAV: NO SIGNAL"
+    Maximum ~200 words.
+  agent: harmonic_analyst
+  async_execution: true
+
+analyze_ichimoku:
+  description: >
+    Analyze the Ichimoku Theories brief for ${topic} on the {timeframe}
+    timeframe as of {current_date}.
+
+    The brief is:
+    {ichimoku_brief}
+
+    Using Ichimoku Kinkō Hyō + Hosoda's Time, Wave, and Price theories:
+    1. What is the kumo status (price above/inside/below, bullish/bearish
+       kumo, twist ahead)?
+    2. What is the TK cross status, and is it above, inside, or below the
+       kumo?
+    3. Does the Chikou Span confirm the directional bias?
+    4. What do the time cycles indicate? When is the next projected turning
+       point?
+    5. What wave structure is developing (I/V/N/P/Y/W)? How many legs
+       remain?
+    6. What are the applicable price targets (V/E/N/NT)?
+    7. BOTTOM LINE: Does Ichimoku signal a direction and entry zone?
+       What is the timing context from Time Theory?
+  expected_output: >
+    A markdown section titled "## Ichimoku Verdict" containing:
+    - Kumo status + directional filter implication
+    - TK cross status + strength (above/inside/below kumo)
+    - Chikou confirmation or denial
+    - Time cycle forecast (when next turn expected)
+    - Wave structure and remaining legs
+    - Price targets (first and second)
+    - One explicit statement: "ICHIMOKU SIGNALS: <Bullish/Bearish>, target
+      $X, next turn ~<date/bars>" or "ICHIMOKU: NEUTRAL / NO SIGNAL"
+    Maximum ~200 words.
+  agent: ichimoku_analyst
+  async_execution: true
+
+analyze_fibstruct:
+  description: >
+    Analyze the FibStruct (Fibonacci Structure Engine) brief for ${topic}
+    on the {timeframe} timeframe as of {current_date}.
+
+    The brief is:
+    {fibstruct_brief}
+
+    Using SMC structure analysis and Fibonacci confluence methodology:
+    1. What is the current structure bias (BOS/CHoCH context)? Was there
+       a recent CHoCH — if so, treat it as the primary reversal signal.
+    2. What is the Fib Direction (Long ↑ / Short ↓)?
+    3. What is the confluence score and its tier (Strong/Moderate/Weak/None)?
+       Which Fibonacci level is price nearest to?
+    4. Is price in Premium or Discount? What does the zone classification
+       imply for entry (buy in Discount, sell in Premium)?
+    5. Is there a recent liquidity sweep (EQH/EQL)? Sweep + Golden Zone
+       confluence = highest conviction.
+    6. What are the Golden Zone ($X–$Y) and Target Zone ($X–$Y) levels?
+    7. BOTTOM LINE: What is the FibStruct directional bias, entry zone,
+       and target zone?
+  expected_output: >
+    A markdown section titled "## FibStruct Verdict" containing:
+    - Structure bias + recent BOS/CHoCH context
+    - Fibonacci anchor levels (swing high/low)
+    - Key Fib level near current price + confluence score tier
+    - Premium/Discount zone classification + entry implication
+    - Liquidity sweep status (if relevant)
+    - Golden Zone and Target Zone as price ranges
+    - One explicit statement: "FIBSTRUCT SIGNALS: <Bullish/Bearish>, entry
+      zone $X–$Y, target $X" or "FIBSTRUCT: NO SIGNAL / NEUTRAL"
+    Maximum ~200 words.
+  agent: fibstruct_analyst
+  async_execution: true
+
+analyze_demark:
+  description: >
+    Analyze the TD Sequential brief for ${topic} on the {timeframe}
+    timeframe as of {current_date}.
+
+    The brief is:
+    {demark_brief}
+
+    Using Tom DeMark's TD Sequential methodology:
+    1. What is the current count direction and number? Is it mid-sequence
+       or near completion?
+    2. Are there any "Long" or "Short" signals at 9 or 13? List each
+       with recency (bars ago).
+    3. For each signal found, is it: active (< 5 bars), fading (6–20 bars),
+       or stale (> 20 bars)?
+    4. Does a TD 9 or TD 13 agree or disagree with the directional calls
+       from the other indicators?
+    5. BOTTOM LINE: What is the DeMark exhaustion read? Does it time a
+       potential reversal NOW, soon, or not yet?
+  expected_output: >
+    A markdown section titled "## DeMark Verdict" containing:
+    - Current count direction and number
+    - List of TD 9 / TD 13 signals with direction (Long/Short) and recency
+    - Recency classification for each signal (active / fading / stale)
+    - Directional implication and timing assessment
+    - One explicit statement: "DEMARK SIGNALS: <Long/Short exhaustion>
+      at count <9/13>, <active/fading>" or "DEMARK: NO ACTIVE SIGNAL"
+    Maximum ~150 words.
+  agent: demark_analyst
+  async_execution: true
+
+synthesize_tv_task:
+  description: >
+    Synthesize the five indicator verdicts on ${topic} ({timeframe}
+    timeframe, {current_date}) into ONE concise, actionable trading
+    recommendation.
+
+    Read all five verdicts and perform a confluence count:
+    - Count how many indicators signal BULLISH vs BEARISH vs NEUTRAL
+    - List the specific confluences (2+ indicators pointing to the same
+      price zone, level, or direction)
+    - List the divergences (indicators disagreeing on direction)
+
+    Then construct the final recommendation with these sections:
+
+    1. "## Synthesized Recommendation — ${topic} ({timeframe})"
+    2. "### Bottom Line" — ONE sentence: direction + instrument + conviction
+       (1–5). If fewer than 2 indicators align, write "Stand aside."
+    3. "### Confluences" — bullet per confluence, tagged by which indicators
+       agree. E.g.: "[MCPE + FibStruct] Price in Discount/Accumulation zone"
+    4. "### Execution" — entry zone / stop-invalidation / Target 1 /
+       Target 2 / R:R / instrument suggestion
+       Entry from: FibStruct Golden Zone or Harmonic PRZ (whichever is present)
+       Stop from: structural invalidation (CHoCH level, cycle low, etc.)
+       Target 1: nearest FibStruct target or MCPE projection
+       Target 2: Ichimoku N-wave target or FibStruct Target Zone
+    5. "### Invalidation" — ONE sentence: the price or event that kills
+       the thesis
+    6. "### Divergences" — where the 5 indicators disagree, and which
+       takes precedence for this timeframe (e.g., DeMark exhaustion
+       against trend only delays, not reverses a MCPE Markup phase)
+    7. "### No-Trade Conditions" — reasons to skip entirely
+
+    Style: tight, decisive. Write for a trader with 30 seconds. Tickers
+    prefixed with $. Prices in dollars, never percent for stops/targets.
+  expected_output: >
+    A markdown document following the exact 7-section structure above.
+    Maximum ~500 words. Conviction 5/5 only when ≥ 4 indicators align.
+    If the five analyst verdicts contain "NO SIGNAL" for 3 or more
+    indicators, the Bottom Line must be "Stand aside."
+  agent: tv_chief_strategist
+  context:
+    - analyze_mcpe
+    - analyze_harmonic
+    - analyze_ichimoku
+    - analyze_fibstruct
+    - analyze_demark
+  output_file: tv_trade_plan.md

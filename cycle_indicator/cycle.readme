@@ -1,0 +1,179 @@
+Market Cycle Projection Engine
+
+WHAT IT DOES
+Market Cycle Projection Engine (MCPE) is a fully original indicator
+built in Pine Script v6 that automatically identifies the current
+market cycle phase, draws key structural levels, and projects the
+next expected price movement all on a single overlay chart.
+
+Unlike traditional indicators that react to price, MCPE analyzes
+the internal structure of market behavior using a four-phase cycle
+model inspired by Wyckoff methodology, combined with a linear
+regression slope engine and volatility expansion/contraction logic.
+
+
+WHAT MAKES IT ORIGINAL
+Most cycle indicators either repaint, rely on subjective drawing,
+or require manual input. MCPE does none of these.
+
+The core innovation is a three-factor phase classification engine:
+1. Linear Regression Slope measures the true directional
+momentum of price over the cycle lookback period, normalized
+by ATR to make it comparable across all assets and timeframes.
+
+2. ATR Ratio (Volatility State) compares current ATR to its
+own slow average to detect whether volatility is expanding
+(trending phase) or contracting (consolidation phase).
+
+3. Price Position in Cycle Range determines whether price
+is in the lower 40% (potential accumulation) or upper 60%
+(potential distribution) of the cycle's high/low range.
+
+These three factors combine to produce a four-phase classification
+that updates automatically on every bar without any repainting.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+THE FOUR CYCLE PHASES
+
+🔵 ACCUMULATION
+Slope is flat. Volatility is contracting. Price is in the
+lower portion of the cycle range. This is where institutions
+quietly build long positions before the markup phase.
+Candles colored cyan.
+
+🟢 MARKUP
+Slope is rising. Volatility is expanding. This is the
+trending upward phase the reward for accumulation patience.
+Candles colored green.
+
+🟠 DISTRIBUTION
+Slope is flat again. Volatility is contracting. Price is now
+in the upper portion of the cycle range. Smart money is
+offloading positions to retail buyers.
+Candles colored orange.
+
+🔴 MARKDOWN
+Slope is falling. Volatility is expanding downward. The
+cycle completes its rotation back toward accumulation.
+Candles colored red.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HOW TO USE
+
+Step 1 Read the Phase
+Look at the current candle color and the Dashboard panel
+(top-right). The Cycle Phase row tells you exactly where the
+market is in its current rotation.
+
+Step 2 Check Cycle Position %
+The Cycle Position metric shows where price sits within the
+current cycle range (0% = bottom, 100% = top).
+Below 30% = potential accumulation opportunity.
+Above 70% = potential distribution / caution zone.
+
+Step 3 Use the Projection Arrow
+When a phase transition occurs, MCPE draws a directional
+projection line showing the expected next move. The arrow
+length is calculated from the average of the previous two
+cycle swing ranges and expressed as a percentage of current
+price. This is NOT a price prediction it is a probabilistic
+projection based on historical cycle amplitude.
+
+Step 4 Respect the Key Levels
+Three horizontal levels are always visible:
+Cycle High upper boundary of the current cycle range.
+Cycle Low lower boundary of the current cycle range.
+Mid the equilibrium level between the two.
+Price returning to Mid after an extreme move is a common
+mean-reversion setup.
+
+Step 5 Confirm with Volatility and Volume
+The Dashboard shows Volatility Status and Volume reading.
+Strong signals occur when phase transitions align with
+expanding volatility and elevated volume simultaneously.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CALCULATION LOGIC
+
+Phase Classification:
+lr_slope = linreg(close, cycle_len, 0) - linreg(close, cycle_len, 1)
+lr_slope_norm = lr_slope / ATR(14)
+atr_ratio = ATR(14) / ATR(cycle_len)
+price_pos = (close - cycle_low) / cycle_range
+
+Markup : lr_slope_norm > 0.1 AND atr_ratio > 1.1
+Markdown : lr_slope_norm < -0.1 AND atr_ratio > 1.1
+Accumulation: slope flat AND price_pos < 0.4
+Distribution: slope flat AND price_pos >= 0.4
+
+Projection Amplitude (Last Cycle method):
+avg_range = (|meso_high - meso_low| + |prev_high - prev_low|) / 2
+target = last_pivot + avg_range (bull) or - avg_range (bear)
+
+Volatility Status:
+High when ATR(14) > SMA(ATR(14), 20) * 1.3
+
+Cycle Strength (0-100):
+Measures how far price deviates from the cycle midpoint,
+expressed as a percentage of the total cycle range.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SETTINGS
+Cycle lookback (bars)
+Controls how many bars define one full cycle. Increase for
+macro analysis, decrease for shorter-term cycles.
+Recommended: 50 for daily, 30 for 4H, 20 for 1H.
+
+S/R pivot lookback
+Controls how far back the indicator looks for key support
+and resistance pivot points.
+
+Projection bars
+How many bars into the future the projection line extends.
+
+Projection basis
+Three methods available:
+Cycle Average uses average of last two swing ranges.
+Last Cycle uses 75% of the most recent cycle range.
+ATR Multiple uses ATR × 30 as a fixed projection size.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMPATIBILITY
+
+Works on all assets Crypto, Forex, Stocks, Indices, Futures.
+Works on all timeframes.
+Best results on Daily and 4H charts for swing trading.
+For intraday use, reduce cycle_len to 20-30.
+
+No repainting. All signals calculated on bar close.
+No lookahead bias. No request.security() with lookahead.
+No Heikin Ashi or non-standard chart dependency.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ALERTS INCLUDED
+
+Phase: Accumulation detected
+Phase: Markup detected
+Phase: Distribution detected
+Phase: Markdown detected
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DISCLAIMER
+
+This indicator is provided for educational and informational
+purposes only. It does not constitute financial advice or a
+recommendation to buy or sell any asset. Past cycle patterns
+do not guarantee future results. Markets are inherently
+unpredictable. Always apply your own analysis and use proper
+risk management before placing any trade. The author is not
+responsible for any trading losses incurred from use of this
+indicator.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
