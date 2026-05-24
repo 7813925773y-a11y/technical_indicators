@@ -53,10 +53,10 @@
   #priceChip { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--bright); background: var(--card); padding: 4px 10px; border-radius: var(--radius); border: 1px solid var(--border); display: none; }
 
   /* main */
-  .main { padding: 20px 24px; }
+  .main { padding: 20px 0; }
 
   /* signal summary bar (top of results) */
-  #signalSummary { display: none; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  #signalSummary { display: none; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; padding: 0 24px; }
   .summary-chip {
     display: flex; align-items: center; gap: 6px;
     padding: 6px 14px; border-radius: 20px;
@@ -86,10 +86,10 @@
   .tab-panel.active { display: block; }
 
   /* indicator card */
-  .ind-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; overflow: hidden; }
+  .ind-card { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); overflow: hidden; }
 
   /* signal bar inside each card */
-  .sig-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; background: var(--surface); }
+  .sig-bar { padding: 10px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; background: var(--surface); }
   .sig-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 16px; font-size: 13px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; flex-shrink: 0; }
   .sig-BULLISH { background: #1a3a1a; color: #3fb950; border: 1px solid #3fb95055; }
   .sig-BEARISH { background: #3a1a1a; color: #f85149; border: 1px solid #f8514955; }
@@ -115,7 +115,7 @@
   .no-shot { color: var(--muted); font-size: 12px; text-align: center; padding: 60px 20px; align-self: center; }
 
   /* content pane */
-  .ind-content { padding: 14px 18px; overflow: hidden; }
+  .ind-content { padding: 14px 24px; overflow: hidden; }
   .ind-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 
   details.brief-details { margin-bottom: 12px; }
@@ -143,16 +143,16 @@
   .md-content th { background: var(--surface); color: var(--bright); }
 
   /* synthesis panel */
-  #synthPanel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; padding: 20px 24px; }
+  #synthPanel { background: var(--card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-top: 16px; padding: 20px 24px; }
   .synth-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .synth-header h2 { font-size: 15px; color: var(--bright); }
   .model-badge { font-size: 11px; background: var(--surface); color: var(--muted); padding: 3px 9px; border-radius: 10px; border: 1px solid var(--border); }
   .model-badge.fallback { color: var(--yellow); border-color: #d2992233; }
 
   /* log */
-  #logToggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 8px 0; display: flex; align-items: center; gap: 4px; margin-top: 12px; }
+  #logToggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 8px 24px; display: flex; align-items: center; gap: 4px; margin-top: 12px; }
   #logToggle:hover { color: var(--text); }
-  #eventLog { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.7; max-height: 220px; overflow-y: auto; margin-top: 6px; }
+  #eventLog { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.7; max-height: 220px; overflow-y: auto; margin: 6px 24px 0; }
   .log-line { margin: 1px 0; }
   .log-line.info { color: #58a6ff; }
   .log-line.ok   { color: var(--green); }
@@ -170,11 +170,11 @@
   .demark-chart-wrap {
     background: #090d12;
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px 8px;
+    padding: 0;
   }
   #demark-chart-container {
     width: 100%;
-    height: 380px;
+    height: 440px;
     border-radius: 4px;
     overflow: hidden;
   }
@@ -182,7 +182,7 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    padding: 6px 0 2px;
+    padding: 6px 24px 8px;
     font-size: 11px;
     color: var(--muted);
   }
@@ -193,11 +193,11 @@
   .fibstruct-chart-wrap {
     background: #090d12;
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px 8px;
+    padding: 0;
   }
   #fibstruct-chart-container {
     width: 100%;
-    height: 420px;
+    height: 480px;
     border-radius: 4px;
     overflow: hidden;
   }
@@ -205,7 +205,7 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    padding: 6px 0 2px;
+    padding: 6px 24px 8px;
     font-size: 11px;
     color: var(--muted);
   }
@@ -213,7 +213,7 @@
   .fibstruct-zone-bar {
     display: flex;
     gap: 12px;
-    padding: 5px 0 0;
+    padding: 5px 24px 0;
     font-size: 11px;
     flex-wrap: wrap;
   }
@@ -230,11 +230,11 @@
   .mcpe-chart-wrap {
     background: #090d12;
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px 8px;
+    padding: 0;
   }
   #mcpe-chart-container {
     width: 100%;
-    height: 420px;
+    height: 480px;
     border-radius: 4px;
     overflow: hidden;
   }
@@ -242,7 +242,7 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    padding: 6px 0 2px;
+    padding: 6px 24px 8px;
     font-size: 11px;
     color: var(--muted);
   }
@@ -250,7 +250,7 @@
   .mcpe-summary-bar {
     display: flex;
     gap: 12px;
-    padding: 5px 16px;
+    padding: 5px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     font-size: 11px;
@@ -264,11 +264,11 @@
   .harmonic-chart-wrap {
     background: #090d12;
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px 8px;
+    padding: 0;
   }
   #harmonic-chart-container {
     width: 100%;
-    height: 420px;
+    height: 480px;
     border-radius: 4px;
     overflow: hidden;
   }
@@ -276,7 +276,7 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    padding: 6px 0 2px;
+    padding: 6px 24px 8px;
     font-size: 11px;
     color: var(--muted);
   }
@@ -284,7 +284,7 @@
   .harmonic-prz-bar {
     display: flex;
     gap: 12px;
-    padding: 5px 16px;
+    padding: 5px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     font-size: 11px;
@@ -305,11 +305,11 @@
   .ichimoku-chart-wrap {
     background: #090d12;
     border-bottom: 1px solid var(--border);
-    padding: 12px 16px 8px;
+    padding: 0;
   }
   #ichimoku-chart-container {
     width: 100%;
-    height: 460px;
+    height: 520px;
     border-radius: 4px;
     overflow: hidden;
   }
@@ -317,7 +317,7 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
-    padding: 6px 0 2px;
+    padding: 6px 24px 8px;
     font-size: 11px;
     color: var(--muted);
   }
@@ -325,7 +325,7 @@
   .ichimoku-summary-bar {
     display: flex;
     gap: 12px;
-    padding: 5px 16px;
+    padding: 5px 24px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     font-size: 11px;
@@ -492,7 +492,7 @@
           <span class="sig-badge sig-NEUTRAL">— Waiting</span>
         </div>
         <!-- Zone info bar — populated by renderFibStructChart -->
-        <div id="fibstruct-zones" style="display:none; padding:6px 16px; border-bottom:1px solid var(--border); background:var(--surface);">
+        <div id="fibstruct-zones" style="display:none; padding:6px 24px; border-bottom:1px solid var(--border); background:var(--surface);">
           <div class="fibstruct-zone-bar" id="fibstruct-zone-chips"></div>
         </div>
         <!-- full-width Lightweight Charts candlestick -->
@@ -813,6 +813,8 @@ function showTab(name) {
   document.getElementById(`panel-${name}`).classList.add('active');
   document.getElementById(`tab-btn-${name}`).classList.add('active');
   activeTab = name;
+  // Resize chart when tab becomes visible (panel was display:none, now display:block)
+  requestAnimationFrame(() => _resizeActiveChart(name));
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -843,414 +845,19 @@ function toggleLog() {
   document.getElementById('logToggle').textContent  = (logOpen ? '▼' : '▶') + ' Event log';
 }
 
-// ── Ichimoku Lightweight Chart ────────────────────────────────────────────────
+// ── Shared chart helpers ──────────────────────────────────────────────────────
 
-let _ichimokuChart  = null;
-let _ichimokuSeries = null;
-
-function renderIchimokuChart(chartData) {
-  if (!chartData || typeof LightweightCharts === 'undefined') return;
-
-  const container = document.getElementById('ichimoku-chart-container');
-  if (_ichimokuChart) { _ichimokuChart.remove(); _ichimokuChart = null; _ichimokuSeries = null; }
-
-  _ichimokuChart = LightweightCharts.createChart(container, {
-    width:  container.clientWidth,
-    height: 460,
-    layout: {
-      background:  { type: 'solid', color: '#090d12' },
-      textColor:   '#8b949e',
-      fontSize:    11,
-      fontFamily:  "'SF Mono', 'Fira Code', monospace",
-    },
-    grid: {
-      vertLines: { color: '#30363d22' },
-      horzLines: { color: '#30363d22' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-    },
-    rightPriceScale: {
-      borderColor:  '#30363d',
-      scaleMargins: { top: 0.08, bottom: 0.08 },
-    },
-    timeScale: {
-      borderColor:    '#30363d',
-      timeVisible:    true,
-      secondsVisible: false,
-      barSpacing:     9,
-      rightOffset:    6,
-    },
-    handleScroll: { mouseWheel: true, pressedMouseMove: true },
-    handleScale:  { mouseWheel: true, pinch: true },
-  });
-
-  // Kumo-colored candlesticks
-  _ichimokuSeries = _ichimokuChart.addCandlestickSeries({
-    upColor:          '#26a69a',
-    downColor:        '#ef5350',
-    borderUpColor:    '#26a69a',
-    borderDownColor:  '#ef5350',
-    wickUpColor:      '#26a69a',
-    wickDownColor:    '#ef5350',
-    priceLineVisible: false,
-    lastValueVisible: true,
-  });
-
-  const bars = (chartData.bars || []).map(b => ({
-    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
-    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
-  }));
-  _ichimokuSeries.setData(bars);
-
-  // Swing + TK cross markers
-  if (chartData.markers && chartData.markers.length) {
-    _ichimokuSeries.setMarkers(chartData.markers);
-  }
-
-  // Tenkan Sen (blue-green, solid)
-  if (chartData.tenkan && chartData.tenkan.length) {
-    const s = _ichimokuChart.addLineSeries({
-      color: '#26a69a', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
-      priceLineVisible: false, lastValueVisible: false,
-    });
-    s.setData(chartData.tenkan);
-  }
-
-  // Kijun Sen (red, solid)
-  if (chartData.kijun && chartData.kijun.length) {
-    const s = _ichimokuChart.addLineSeries({
-      color: '#ef5350', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
-      priceLineVisible: false, lastValueVisible: false,
-    });
-    s.setData(chartData.kijun);
-  }
-
-  // Senkou Span A (green, dashed)
-  if (chartData.span_a && chartData.span_a.length) {
-    const s = _ichimokuChart.addLineSeries({
-      color: '#00c89699', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-      priceLineVisible: false, lastValueVisible: false,
-    });
-    s.setData(chartData.span_a);
-  }
-
-  // Senkou Span B (red, dashed)
-  if (chartData.span_b && chartData.span_b.length) {
-    const s = _ichimokuChart.addLineSeries({
-      color: '#ef535099', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-      priceLineVisible: false, lastValueVisible: false,
-    });
-    s.setData(chartData.span_b);
-  }
-
-  // Chikou Span (white, thin)
-  if (chartData.chikou && chartData.chikou.length) {
-    const s = _ichimokuChart.addLineSeries({
-      color: '#ffffff66', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
-      priceLineVisible: false, lastValueVisible: false,
-    });
-    s.setData(chartData.chikou);
-  }
-
-  // Price target lines (N/E/V/NT/2E/3E + cloud levels)
-  const styleMap = [LightweightCharts.LineStyle.Solid,
-                    LightweightCharts.LineStyle.Dotted,
-                    LightweightCharts.LineStyle.Dashed,
-                    LightweightCharts.LineStyle.LargeDashed];
-  (chartData.price_lines || []).forEach(pl => {
-    _ichimokuSeries.createPriceLine({
-      price:            pl.price,
-      color:            pl.color,
-      lineWidth:        pl.width || 1,
-      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible: true,
-      title:            pl.label || '',
-    });
-  });
-
-  _ichimokuChart.timeScale().fitContent();
-
-  // Summary bar
-  const sm    = chartData.summary || {};
-  const sumEl = document.getElementById('ichimoku-summary');
-  if (sm.kumo_pos) {
-    const kumoColors = { above: '#00c896', below: '#ef5350', inside: '#7c4dff' };
-    const kumoCol = kumoColors[sm.kumo_pos] || '#8b949e';
-    const tkCol   = sm.last_tk_cross === 'bull' ? '#00c896' : sm.last_tk_cross === 'bear' ? '#ef5350' : '#8b949e';
-    const tkTxt   = sm.last_tk_cross === 'bull' ? '▲ Bull TK' : sm.last_tk_cross === 'bear' ? '▼ Bear TK' : 'No TK';
-    const waveCol = sm.target_dir === 'bullish' ? '#00c896' : sm.target_dir === 'bearish' ? '#ef5350' : '#8b949e';
-    const nTgt    = sm.targets && sm.targets.N;
-    const eTgt    = sm.targets && sm.targets.E;
-    sumEl.innerHTML = `
-      <div class="ichi-stat"><span class="ichi-stat-label">Kumo</span><span class="ichi-stat-val" style="color:${kumoCol}">${sm.kumo_pos.charAt(0).toUpperCase() + sm.kumo_pos.slice(1)}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">TK</span><span class="ichi-stat-val" style="color:${tkCol}">${tkTxt}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">N-wave</span><span class="ichi-stat-val" style="color:${waveCol}">${sm.target_dir || '—'}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">Swings</span><span class="ichi-stat-val">${sm.swing_count}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">N Target</span><span class="ichi-stat-val">${nTgt ? '$' + nTgt.toFixed(2) : '—'}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">E Target</span><span class="ichi-stat-val">${eTgt ? '$' + eTgt.toFixed(2) : '—'}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">Tenkan</span><span class="ichi-stat-val" style="color:#26a69a">${sm.tenkan ? '$' + sm.tenkan.toFixed(2) : '—'}</span></div>
-      <div class="ichi-stat"><span class="ichi-stat-label">Kijun</span><span class="ichi-stat-val" style="color:#ef5350">${sm.kijun ? '$' + sm.kijun.toFixed(2) : '—'}</span></div>
-    `;
-    sumEl.style.display = 'flex';
-  }
-
-  // Responsive resize
-  const ro = new ResizeObserver(entries => {
-    const w = entries[0].contentRect.width;
-    if (_ichimokuChart && w > 0) _ichimokuChart.resize(w, 460);
-  });
-  ro.observe(container);
+// Compute chart height as ~58% of viewport, clamped to a sensible range.
+function _chartHeight() {
+  return Math.max(380, Math.min(780, Math.round(window.innerHeight * 0.58)));
 }
 
-// ── Harmonic Lightweight Chart ────────────────────────────────────────────────
+const CHART_H = 480;  // fallback — overridden by _chartHeight() at render time
 
-let _harmonicChart  = null;
-let _harmonicSeries = null;
-
-function renderHarmonicChart(chartData) {
-  if (!chartData || typeof LightweightCharts === 'undefined') return;
-
-  const container = document.getElementById('harmonic-chart-container');
-  if (_harmonicChart) { _harmonicChart.remove(); _harmonicChart = null; _harmonicSeries = null; }
-
-  _harmonicChart = LightweightCharts.createChart(container, {
-    width:  container.clientWidth,
-    height: 420,
-    layout: {
-      background:  { type: 'solid', color: '#090d12' },
-      textColor:   '#8b949e',
-      fontSize:    11,
-      fontFamily:  "'SF Mono', 'Fira Code', monospace",
-    },
-    grid: {
-      vertLines: { color: '#30363d22' },
-      horzLines: { color: '#30363d22' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-    },
-    rightPriceScale: {
-      borderColor:  '#30363d',
-      scaleMargins: { top: 0.08, bottom: 0.08 },
-    },
-    timeScale: {
-      borderColor:    '#30363d',
-      timeVisible:    true,
-      secondsVisible: false,
-      barSpacing:     9,
-      rightOffset:    6,
-    },
-    handleScroll: { mouseWheel: true, pressedMouseMove: true },
-    handleScale:  { mouseWheel: true, pinch: true },
-  });
-
-  _harmonicSeries = _harmonicChart.addCandlestickSeries({
-    upColor:          '#26a69a',
-    downColor:        '#ef5350',
-    borderUpColor:    '#26a69a',
-    borderDownColor:  '#ef5350',
-    wickUpColor:      '#26a69a',
-    wickDownColor:    '#ef5350',
-    priceLineVisible: false,
-    lastValueVisible: true,
-  });
-
-  // Plain neutral candles
-  const bars = (chartData.bars || []).map(b => ({
-    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
-    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
-  }));
-  _harmonicSeries.setData(bars);
-
-  // XABCD pivot markers
-  if (chartData.markers && chartData.markers.length) {
-    _harmonicSeries.setMarkers(chartData.markers);
-  }
-
-  // PRZ price lines (top, mid, bot of most recent pattern)
-  const styleMap = [LightweightCharts.LineStyle.Solid,
-                    LightweightCharts.LineStyle.Dotted,
-                    LightweightCharts.LineStyle.Dashed,
-                    LightweightCharts.LineStyle.LargeDashed];
-  (chartData.price_lines || []).forEach(pl => {
-    _harmonicSeries.createPriceLine({
-      price:            pl.price,
-      color:            pl.color,
-      lineWidth:        pl.width || 1,
-      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible: true,
-      title:            pl.label || '',
-    });
-  });
-
-  _harmonicChart.timeScale().fitContent();
-
-  // PRZ info bar
-  const sm  = chartData.summary || {};
-  const bar = document.getElementById('harmonic-prz-bar');
-  if (sm.latest_pattern) {
-    const bull    = sm.latest_bullish;
-    const inPrz   = sm.price_in_prz;
-    const dirCls  = bull ? 'hav-chip-bull' : 'hav-chip-bear';
-    const dirArrow = bull ? '▲' : '▼';
-    bar.innerHTML = `
-      <span class="hav-prz-chip ${dirCls}">${dirArrow} ${sm.latest_pattern}</span>
-      <span class="hav-prz-chip hav-chip-prz">Score ${sm.latest_score}/10${sm.latest_abcd ? ' ✓' : ' ⚠'}</span>
-      <span class="hav-prz-chip hav-chip-prz">PRZ $${sm.latest_prz_bot?.toFixed(2)} – $${sm.latest_prz_top?.toFixed(2)}</span>
-      ${inPrz ? '<span class="hav-prz-chip hav-chip-in">★ Price IN PRZ</span>' : ''}
-      <span class="hav-prz-chip" style="background:#1a1f2c;color:var(--muted);border:1px solid #30363d">${sm.pattern_count} pattern${sm.pattern_count !== 1 ? 's' : ''} total</span>
-    `;
-    bar.style.display = 'flex';
-  } else {
-    bar.innerHTML = '<span style="color:var(--muted);font-size:11px;padding:4px 0">No confirmed harmonic patterns — normal on daily TF (1–4/year expected)</span>';
-    bar.style.display = 'flex';
-  }
-
-  // Responsive resize
-  const ro = new ResizeObserver(entries => {
-    const w = entries[0].contentRect.width;
-    if (_harmonicChart && w > 0) _harmonicChart.resize(w, 420);
-  });
-  ro.observe(container);
-}
-
-// ── MCPE Lightweight Chart ────────────────────────────────────────────────────
-
-let _mcpeChart  = null;
-let _mcpeSeries = null;
-
-function renderMcpeChart(chartData) {
-  if (!chartData || typeof LightweightCharts === 'undefined') return;
-
-  const container = document.getElementById('mcpe-chart-container');
-  if (_mcpeChart) { _mcpeChart.remove(); _mcpeChart = null; _mcpeSeries = null; }
-
-  _mcpeChart = LightweightCharts.createChart(container, {
-    width:  container.clientWidth,
-    height: 420,
-    layout: {
-      background:  { type: 'solid', color: '#090d12' },
-      textColor:   '#8b949e',
-      fontSize:    11,
-      fontFamily:  "'SF Mono', 'Fira Code', monospace",
-    },
-    grid: {
-      vertLines: { color: '#30363d22' },
-      horzLines: { color: '#30363d22' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-    },
-    rightPriceScale: {
-      borderColor:  '#30363d',
-      scaleMargins: { top: 0.08, bottom: 0.08 },
-    },
-    timeScale: {
-      borderColor:    '#30363d',
-      timeVisible:    true,
-      secondsVisible: false,
-      barSpacing:     9,
-      rightOffset:    6,
-    },
-    handleScroll: { mouseWheel: true, pressedMouseMove: true },
-    handleScale:  { mouseWheel: true, pinch: true },
-  });
-
-  _mcpeSeries = _mcpeChart.addCandlestickSeries({
-    upColor:          '#26a69a',
-    downColor:        '#ef5350',
-    borderUpColor:    '#26a69a',
-    borderDownColor:  '#ef5350',
-    wickUpColor:      '#26a69a',
-    wickDownColor:    '#ef5350',
-    priceLineVisible: false,
-    lastValueVisible: true,
-  });
-
-  // Phase-colored candlestick bars
-  const bars = (chartData.bars || []).map(b => ({
-    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
-    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
-  }));
-  _mcpeSeries.setData(bars);
-
-  // Phase transition markers
-  if (chartData.markers && chartData.markers.length) {
-    _mcpeSeries.setMarkers(chartData.markers);
-  }
-
-  // Price lines: Cycle High, Mid, Low, Projection target
-  const styleMap = [LightweightCharts.LineStyle.Solid,
-                    LightweightCharts.LineStyle.Dotted,
-                    LightweightCharts.LineStyle.Dashed,
-                    LightweightCharts.LineStyle.LargeDashed];
-  (chartData.price_lines || []).forEach(pl => {
-    _mcpeSeries.createPriceLine({
-      price:            pl.price,
-      color:            pl.color,
-      lineWidth:        pl.width || 1,
-      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible: true,
-      title:            pl.label || '',
-    });
-  });
-
-  _mcpeChart.timeScale().fitContent();
-
-  // Summary stats bar
-  const sm   = chartData.summary || {};
-  const sumEl = document.getElementById('mcpe-summary');
-  if (sm.phase) {
-    const phaseColors = {
-      Markup:       '#00e676',
-      Accumulation: '#00bcd4',
-      Distribution: '#ff9800',
-      Markdown:     '#ff5252',
-      Transition:   '#7c4dff',
-    };
-    const col = phaseColors[sm.phase] || '#8b949e';
-    sumEl.innerHTML = `
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Phase</span><span class="mcpe-stat-val" style="color:${col}">${sm.phase}</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Duration</span><span class="mcpe-stat-val">${sm.phase_duration}b</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Position</span><span class="mcpe-stat-val">${sm.price_pos_pct}%</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Strength</span><span class="mcpe-stat-val">${sm.cycle_strength}/100</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Volatility</span><span class="mcpe-stat-val">${sm.volatility}</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Volume</span><span class="mcpe-stat-val">${sm.vol_status}</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Projection</span><span class="mcpe-stat-val" style="color:${sm.proj_up ? '#00e676' : '#ff5252'}">${sm.proj_up ? '↑' : '↓'} ${sm.proj_pct?.toFixed(1)}%</span></div>
-      <div class="mcpe-stat"><span class="mcpe-stat-label">Next</span><span class="mcpe-stat-val">${sm.next_phase}</span></div>
-    `;
-    sumEl.style.display = 'flex';
-  }
-
-  // Responsive resize
-  const ro = new ResizeObserver(entries => {
-    const w = entries[0].contentRect.width;
-    if (_mcpeChart && w > 0) _mcpeChart.resize(w, 420);
-  });
-  ro.observe(container);
-}
-
-// ── FibStruct Lightweight Chart ───────────────────────────────────────────────
-
-let _fibStructChart = null;
-let _fibStructSeries = null;
-
-function renderFibStructChart(chartData) {
-  if (!chartData || typeof LightweightCharts === 'undefined') return;
-
-  const container = document.getElementById('fibstruct-chart-container');
-  if (_fibStructChart) { _fibStructChart.remove(); _fibStructChart = null; _fibStructSeries = null; }
-
-  const darkTheme = {
-    width:  container.clientWidth,
-    height: 420,
+function _chartOpts(container, height) {
+  return {
+    width:  container.clientWidth || container.offsetWidth || window.innerWidth,
+    height: height || _chartHeight(),
     layout: {
       background:  { type: 'solid', color: '#090d12' },
       textColor:   '#8b949e',
@@ -1274,77 +881,366 @@ function renderFibStructChart(chartData) {
       borderColor:    '#30363d',
       timeVisible:    true,
       secondsVisible: false,
-      barSpacing:     9,
-      rightOffset:    6,
+      barSpacing:     8,
+      rightOffset:    10,
     },
     handleScroll: { mouseWheel: true, pressedMouseMove: true },
     handleScale:  { mouseWheel: true, pinch: true },
   };
+}
 
-  _fibStructChart = LightweightCharts.createChart(container, darkTheme);
-
-  _fibStructSeries = _fibStructChart.addCandlestickSeries({
-    upColor:         '#26a69a',
-    downColor:       '#ef5350',
-    borderUpColor:   '#26a69a',
-    borderDownColor: '#ef5350',
-    wickUpColor:     '#26a69a',
-    wickDownColor:   '#ef5350',
+function _candleSeries(chart) {
+  return chart.addCandlestickSeries({
+    upColor:          '#26a69a',
+    downColor:        '#ef5350',
+    borderUpColor:    '#26a69a',
+    borderDownColor:  '#ef5350',
+    wickUpColor:      '#26a69a',
+    wickDownColor:    '#ef5350',
     priceLineVisible: false,
     lastValueVisible: true,
   });
+}
 
-  // Candlestick bars (signal-colored)
-  const bars = (chartData.bars || []).map(b => ({
-    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
-    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
-  }));
-  _fibStructSeries.setData(bars);
+const _styleMap = [
+  LightweightCharts.LineStyle.Solid,
+  LightweightCharts.LineStyle.Dotted,
+  LightweightCharts.LineStyle.Dashed,
+  LightweightCharts.LineStyle.LargeDashed,
+];
 
-  // Markers (swing labels, BOS/CHoCH, sweeps, BUY/SELL)
-  if (chartData.markers && chartData.markers.length) {
-    _fibStructSeries.setMarkers(chartData.markers);
-  }
+// Zoom to show last `bars` bars with comfortable spacing (not fitContent).
+// fitContent squishes all bars together; this keeps each candle readable.
+function _smartZoom(chart, totalBars, showBars) {
+  const n = showBars || 60;
+  chart.timeScale().setVisibleLogicalRange({ from: totalBars - n - 0.5, to: totalBars + 1.5 });
+}
 
-  // Fib price lines (horizontal levels)
-  (chartData.price_lines || []).forEach(pl => {
-    // style: 0=solid, 1=dotted, 2=dashed, 3=largeDashed
-    const styleMap = [LightweightCharts.LineStyle.Solid,
-                      LightweightCharts.LineStyle.Dotted,
-                      LightweightCharts.LineStyle.Dashed,
-                      LightweightCharts.LineStyle.LargeDashed];
-    _fibStructSeries.createPriceLine({
-      price:               pl.price,
-      color:               pl.color,
-      lineWidth:           pl.width || 1,
-      lineStyle:           styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible:    true,
-      title:               pl.label || '',
+// Charts indexed by key for tab-switch resize
+const _charts = {};
+function _resizeActiveChart(name) {
+  const entry = _charts[name];
+  if (!entry) return;
+  const el = document.getElementById(`${name}-chart-container`);
+  if (!el) return;
+  const w = el.clientWidth || el.offsetWidth;
+  const h = _chartHeight();
+  if (w > 0) entry.chart.resize(w, h);
+}
+
+function _addPriceLines(series, lines) {
+  (lines || []).forEach(pl => {
+    series.createPriceLine({
+      price:            pl.price,
+      color:            pl.color,
+      lineWidth:        pl.width || 1,
+      lineStyle:        _styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true,
+      title:            pl.label || '',
     });
   });
+}
 
-  _fibStructChart.timeScale().fitContent();
+// OHLC crosshair tooltip — shown top-left of each chart container
+function _addOhlcTooltip(chart, series, container) {
+  container.style.position = 'relative';
+  const tip = document.createElement('div');
+  tip.style.cssText = [
+    'position:absolute', 'top:10px', 'left:12px', 'z-index:10',
+    'background:#0d111799', 'border:1px solid #30363d66', 'border-radius:4px',
+    'padding:3px 10px', 'font-size:10px', 'font-family:monospace',
+    'color:#c9d1d9', 'pointer-events:none', 'display:none', 'white-space:nowrap',
+  ].join(';');
+  container.appendChild(tip);
+  chart.subscribeCrosshairMove(p => {
+    if (!p.time) { tip.style.display = 'none'; return; }
+    const b = p.seriesData.get(series);
+    if (!b || b.open === undefined) { tip.style.display = 'none'; return; }
+    const cl = b.close >= b.open ? '#26a69a' : '#ef5350';
+    tip.innerHTML = `<span style="color:#6e7681">O</span> ${b.open.toFixed(2)} <span style="color:#6e7681">H</span> ${b.high.toFixed(2)} <span style="color:#6e7681">L</span> ${b.low.toFixed(2)} <span style="color:#6e7681">C</span> <b style="color:${cl}">${b.close.toFixed(2)}</b>`;
+    tip.style.display = 'block';
+  });
+}
 
-  // Zone chips (golden zone + target zone)
+// ── Ichimoku Lightweight Chart ────────────────────────────────────────────────
+
+let _ichimokuChart  = null;
+let _ichimokuSeries = null;
+
+function renderIchimokuChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const H = _chartHeight();
+  const container = document.getElementById('ichimoku-chart-container');
+  container.style.height = H + 'px';
+  if (_ichimokuChart) { _ichimokuChart.remove(); _ichimokuChart = null; _ichimokuSeries = null; }
+
+  _ichimokuChart = LightweightCharts.createChart(container, _chartOpts(container, H));
+
+  // ── Cloud fill (area series, added first so candles render on top) ────────
+  // Bullish cloud (SpanA >= SpanB): green fill between lines
+  const _areaOpts = (lineCol, fillTop, fillBot) => ({
+    lineColor: lineCol, lineWidth: 2,
+    topColor: fillTop, bottomColor: fillBot,
+    priceLineVisible: false, lastValueVisible: false,
+    crosshairMarkerVisible: false,
+  });
+  if (chartData.cloud_bull_top?.length) {
+    const top = _ichimokuChart.addAreaSeries(_areaOpts('#26a69a88', 'transparent', 'rgba(38,166,154,0.12)'));
+    top.setData(chartData.cloud_bull_top);
+    const bot = _ichimokuChart.addAreaSeries(_areaOpts('#26a69a44', 'rgba(38,166,154,0.12)', 'transparent'));
+    bot.setData(chartData.cloud_bull_bot);
+  }
+  // Bearish cloud (SpanB > SpanA): red fill between lines
+  if (chartData.cloud_bear_top?.length) {
+    const top = _ichimokuChart.addAreaSeries(_areaOpts('#ef535088', 'transparent', 'rgba(239,83,80,0.12)'));
+    top.setData(chartData.cloud_bear_top);
+    const bot = _ichimokuChart.addAreaSeries(_areaOpts('#ef535044', 'rgba(239,83,80,0.12)', 'transparent'));
+    bot.setData(chartData.cloud_bear_bot);
+  }
+
+  // ── Tenkan Sen / Kijun Sen ────────────────────────────────────────────────
+  const _line2 = (col, w, style) => ({
+    color: col, lineWidth: w, lineStyle: style,
+    priceLineVisible: false, lastValueVisible: false,
+    crosshairMarkerVisible: false,
+  });
+  if (chartData.tenkan?.length) {
+    const s = _ichimokuChart.addLineSeries(_line2('#26a69a', 2, LightweightCharts.LineStyle.Solid));
+    s.setData(chartData.tenkan);
+  }
+  if (chartData.kijun?.length) {
+    const s = _ichimokuChart.addLineSeries(_line2('#ef5350', 2, LightweightCharts.LineStyle.Solid));
+    s.setData(chartData.kijun);
+  }
+  // Chikou Span (close shifted back 26 bars — faint white)
+  if (chartData.chikou?.length) {
+    const s = _ichimokuChart.addLineSeries(_line2('#ffffff55', 1, LightweightCharts.LineStyle.Solid));
+    s.setData(chartData.chikou);
+  }
+
+  // ── Kumo-colored candlesticks (added last = rendered on top) ─────────────
+  _ichimokuSeries = _candleSeries(_ichimokuChart);
+  _ichimokuSeries.setData((chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  })));
+
+  if (chartData.markers?.length) _ichimokuSeries.setMarkers(chartData.markers);
+  _addPriceLines(_ichimokuSeries, chartData.price_lines);
+  _addOhlcTooltip(_ichimokuChart, _ichimokuSeries, container);
+  _smartZoom(_ichimokuChart, (chartData.bars||[]).length);
+  _charts['ichimoku'] = { chart: _ichimokuChart, h: H };
+
+  // Summary bar
+  const sm    = chartData.summary || {};
+  const sumEl = document.getElementById('ichimoku-summary');
+  if (sm.kumo_pos) {
+    const kumoColors = { above: '#00c896', below: '#ef5350', inside: '#7c4dff' };
+    const kumoCol = kumoColors[sm.kumo_pos] || '#8b949e';
+    const tkCol   = sm.last_tk_cross === 'bull' ? '#00c896' : sm.last_tk_cross === 'bear' ? '#ef5350' : '#8b949e';
+    const tkTxt   = sm.last_tk_cross === 'bull' ? '▲ Bull TK' : sm.last_tk_cross === 'bear' ? '▼ Bear TK' : 'No TK';
+    const waveCol = sm.target_dir === 'bullish' ? '#00c896' : sm.target_dir === 'bearish' ? '#ef5350' : '#8b949e';
+    const nTgt    = sm.targets?.N, eTgt = sm.targets?.E;
+    sumEl.innerHTML = `
+      <div class="ichi-stat"><span class="ichi-stat-label">Kumo</span><span class="ichi-stat-val" style="color:${kumoCol}">${sm.kumo_pos.charAt(0).toUpperCase()+sm.kumo_pos.slice(1)}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">TK</span><span class="ichi-stat-val" style="color:${tkCol}">${tkTxt}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">N-wave</span><span class="ichi-stat-val" style="color:${waveCol}">${sm.target_dir||'—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Swings</span><span class="ichi-stat-val">${sm.swing_count}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">N Target</span><span class="ichi-stat-val">${nTgt?'$'+nTgt.toFixed(2):'—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">E Target</span><span class="ichi-stat-val">${eTgt?'$'+eTgt.toFixed(2):'—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Tenkan</span><span class="ichi-stat-val" style="color:#26a69a">${sm.tenkan?'$'+sm.tenkan.toFixed(2):'—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Kijun</span><span class="ichi-stat-val" style="color:#ef5350">${sm.kijun?'$'+sm.kijun.toFixed(2):'—'}</span></div>
+    `;
+    sumEl.style.display = 'flex';
+  }
+
+  const ro = new ResizeObserver(e => { const w=e[0].contentRect.width; const h=_chartHeight(); if(_ichimokuChart&&w>0)_ichimokuChart.resize(w,h); });
+  ro.observe(container);
+}
+
+// ── Harmonic Lightweight Chart ────────────────────────────────────────────────
+
+let _harmonicChart  = null;
+let _harmonicSeries = null;
+
+function renderHarmonicChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const H = _chartHeight();
+  const container = document.getElementById('harmonic-chart-container');
+  container.style.height = H + 'px';
+  if (_harmonicChart) { _harmonicChart.remove(); _harmonicChart = null; _harmonicSeries = null; }
+
+  _harmonicChart = LightweightCharts.createChart(container, _chartOpts(container, H));
+  _harmonicSeries = _candleSeries(_harmonicChart);
+
+  _harmonicSeries.setData((chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  })));
+
+  if (chartData.markers?.length) _harmonicSeries.setMarkers(chartData.markers);
+  _addPriceLines(_harmonicSeries, chartData.price_lines);
+  _addOhlcTooltip(_harmonicChart, _harmonicSeries, container);
+  _smartZoom(_harmonicChart, (chartData.bars||[]).length);
+  _charts['harmonic'] = { chart: _harmonicChart, h: H };
+
+  // "No patterns" watermark overlay on chart canvas
+  const sm  = chartData.summary || {};
+  const bar = document.getElementById('harmonic-prz-bar');
+  if (sm.latest_pattern) {
+    const bull = sm.latest_bullish, inPrz = sm.price_in_prz;
+    const dirCls = bull ? 'hav-chip-bull' : 'hav-chip-bear';
+    bar.innerHTML = `
+      <span class="hav-prz-chip ${dirCls}">${bull?'▲':'▼'} ${sm.latest_pattern}</span>
+      <span class="hav-prz-chip hav-chip-prz">Score ${sm.latest_score}/10${sm.latest_abcd?' ✓':' ⚠'}</span>
+      <span class="hav-prz-chip hav-chip-prz">PRZ $${sm.latest_prz_bot?.toFixed(2)} – $${sm.latest_prz_top?.toFixed(2)}</span>
+      ${inPrz?'<span class="hav-prz-chip hav-chip-in">★ IN PRZ</span>':''}
+      <span class="hav-prz-chip" style="background:#1a1f2c;color:var(--muted);border:1px solid #30363d">${sm.pattern_count} pattern${sm.pattern_count!==1?'s':''} total</span>
+    `;
+    bar.style.display = 'flex';
+    // Remove any previous no-pattern overlay
+    container.querySelector('.hav-no-pattern')?.remove();
+  } else {
+    bar.innerHTML = '<span style="color:var(--muted);font-size:11px;padding:4px 0">No confirmed patterns — scanning…</span>';
+    bar.style.display = 'flex';
+    // Centered watermark text on chart
+    container.style.position = 'relative';
+    const ov = document.createElement('div');
+    ov.className = 'hav-no-pattern';
+    ov.style.cssText = [
+      'position:absolute','inset:0','display:flex','flex-direction:column',
+      'align-items:center','justify-content:center','pointer-events:none',
+      'z-index:5','gap:6px',
+    ].join(';');
+    ov.innerHTML = `
+      <div style="font-size:28px;opacity:0.12">〜〜〜〜〜</div>
+      <div style="color:#8b949e;font-size:13px;font-weight:600">No qualifying XABCD pattern</div>
+      <div style="color:#6e7681;font-size:11px">1–4 patterns per year on daily TF — this is normal</div>
+    `;
+    container.appendChild(ov);
+  }
+
+  const ro = new ResizeObserver(e => { const w=e[0].contentRect.width; const h=_chartHeight(); if(_harmonicChart&&w>0)_harmonicChart.resize(w,h); });
+  ro.observe(container);
+}
+
+// ── MCPE Lightweight Chart ────────────────────────────────────────────────────
+
+let _mcpeChart  = null;
+let _mcpeSeries = null;
+
+function renderMcpeChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const H = _chartHeight();
+  const container = document.getElementById('mcpe-chart-container');
+  container.style.height = H + 'px';
+  if (_mcpeChart) { _mcpeChart.remove(); _mcpeChart = null; _mcpeSeries = null; }
+
+  _mcpeChart   = LightweightCharts.createChart(container, _chartOpts(container, H));
+  _mcpeSeries  = _candleSeries(_mcpeChart);
+
+  _mcpeSeries.setData((chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  })));
+
+  if (chartData.markers?.length) _mcpeSeries.setMarkers(chartData.markers);
+  _addPriceLines(_mcpeSeries, chartData.price_lines);
+  _addOhlcTooltip(_mcpeChart, _mcpeSeries, container);
+  _smartZoom(_mcpeChart, (chartData.bars||[]).length);
+  _charts['mcpe'] = { chart: _mcpeChart, h: H };
+
+  // Summary stats bar + position gauge
+  const sm   = chartData.summary || {};
+  const sumEl = document.getElementById('mcpe-summary');
+  if (sm.phase) {
+    const phaseColors = {
+      Markup:'#00e676', Accumulation:'#00bcd4',
+      Distribution:'#ff9800', Markdown:'#ff5252', Transition:'#7c4dff',
+    };
+    const col = phaseColors[sm.phase] || '#8b949e';
+    const pos = sm.price_pos_pct;
+    const posCol = pos < 30 ? '#00c896' : pos > 70 ? '#ef5350' : '#ffd600';
+    sumEl.innerHTML = `
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Phase</span><span class="mcpe-stat-val" style="color:${col}">${sm.phase}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Duration</span><span class="mcpe-stat-val">${sm.phase_duration}b</span></div>
+      <div class="mcpe-stat" style="flex-direction:column;gap:2px;align-items:flex-start">
+        <span class="mcpe-stat-label">Cycle Pos</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:80px;height:6px;background:#30363d;border-radius:3px;overflow:hidden">
+            <div style="width:${pos}%;height:100%;background:${posCol};border-radius:3px;transition:width 0.4s"></div>
+          </div>
+          <span class="mcpe-stat-val" style="color:${posCol}">${pos}%</span>
+        </div>
+      </div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Strength</span><span class="mcpe-stat-val">${sm.cycle_strength}/100</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Volatility</span><span class="mcpe-stat-val">${sm.volatility}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Volume</span><span class="mcpe-stat-val">${sm.vol_status}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Proj</span><span class="mcpe-stat-val" style="color:${sm.proj_up?'#00e676':'#ff5252'}">${sm.proj_up?'↑':'↓'} ${sm.proj_pct?.toFixed(1)}%</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Next</span><span class="mcpe-stat-val">${sm.next_phase}</span></div>
+    `;
+    sumEl.style.display = 'flex';
+  }
+
+  const ro = new ResizeObserver(e => { const w=e[0].contentRect.width; const h=_chartHeight(); if(_mcpeChart&&w>0)_mcpeChart.resize(w,h); });
+  ro.observe(container);
+}
+
+// ── FibStruct Lightweight Chart ───────────────────────────────────────────────
+
+let _fibStructChart = null;
+let _fibStructSeries = null;
+
+function renderFibStructChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const H = _chartHeight();
+  const container = document.getElementById('fibstruct-chart-container');
+  container.style.height = H + 'px';
+  if (_fibStructChart) { _fibStructChart.remove(); _fibStructChart = null; _fibStructSeries = null; }
+
+  _fibStructChart  = LightweightCharts.createChart(container, _chartOpts(container, H));
+  _fibStructSeries = _candleSeries(_fibStructChart);
+
+  _fibStructSeries.setData((chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  })));
+
+  // Boost marker sizes: swing labels larger, CHoCH/BOS more prominent
+  const boostedMarkers = (chartData.markers || []).map(m => {
+    const txt = m.text || '';
+    if (txt === 'CHoCH') return { ...m, size: 2.0 };
+    if (txt === 'BOS')   return { ...m, size: 1.8 };
+    if (txt === 'SWP')   return { ...m, size: 1.0 };
+    if (['HH','HL','LH','LL'].includes(txt)) return { ...m, size: 1.3 };
+    return m;  // BUY/SELL keep their original size (2.0)
+  });
+  if (boostedMarkers.length) _fibStructSeries.setMarkers(boostedMarkers);
+
+  _addPriceLines(_fibStructSeries, chartData.price_lines);
+  _addOhlcTooltip(_fibStructChart, _fibStructSeries, container);
+  _smartZoom(_fibStructChart, (chartData.bars||[]).length);
+  _charts['fibstruct'] = { chart: _fibStructChart, h: H };
+
+  // Zone chips
   const gz  = chartData.golden_zone || {};
   const tz  = chartData.target_zone || {};
   const chips = document.getElementById('fibstruct-zone-chips');
   chips.innerHTML = '';
-  if (gz.top && gz.bot) {
+  if (gz.top && gz.bot)
     chips.innerHTML += `<span class="fib-zone-chip fib-zone-golden">★ Golden Zone 0.5–0.786  $${gz.bot.toFixed(2)} – $${gz.top.toFixed(2)}</span>`;
-  }
   if (tz.top && tz.bot) {
-    const cls = tz.direction >= 0 ? 'fib-zone-target-bull' : 'fib-zone-target-bear';
+    const cls   = tz.direction >= 0 ? 'fib-zone-target-bull' : 'fib-zone-target-bear';
     const arrow = tz.direction >= 0 ? '↑' : '↓';
     chips.innerHTML += `<span class="fib-zone-chip ${cls}">${arrow} Target Zone -0.5–-0.618  $${tz.bot.toFixed(2)} – $${tz.top.toFixed(2)}</span>`;
   }
   document.getElementById('fibstruct-zones').style.display = chips.children.length ? 'block' : 'none';
 
-  // Responsive resize
-  const ro = new ResizeObserver(entries => {
-    const w = entries[0].contentRect.width;
-    if (_fibStructChart && w > 0) _fibStructChart.resize(w, 420);
-  });
+  const ro = new ResizeObserver(e => { const w=e[0].contentRect.width; const h=_chartHeight(); if(_fibStructChart&&w>0)_fibStructChart.resize(w,h); });
   ro.observe(container);
 }
 
@@ -1356,97 +1252,47 @@ let _demarkSeries = null;
 function renderDemarkChart(chartData) {
   if (!chartData || !chartData.length || typeof LightweightCharts === 'undefined') return;
 
+  const H = _chartHeight();
   const container = document.getElementById('demark-chart-container');
+  container.style.height = H + 'px';
+  if (_demarkChart) { _demarkChart.remove(); _demarkChart = null; _demarkSeries = null; }
 
-  // Destroy previous instance
-  if (_demarkChart) {
-    _demarkChart.remove();
-    _demarkChart = null;
-    _demarkSeries = null;
-  }
+  _demarkChart  = LightweightCharts.createChart(container, _chartOpts(container, H));
+  _demarkSeries = _candleSeries(_demarkChart);
 
-  _demarkChart = LightweightCharts.createChart(container, {
-    width:  container.clientWidth,
-    height: 380,
-    layout: {
-      background:    { type: 'solid', color: '#090d12' },
-      textColor:     '#8b949e',
-      fontSize:      11,
-      fontFamily:    "'SF Mono', 'Fira Code', monospace",
-    },
-    grid: {
-      vertLines: { color: '#30363d33' },
-      horzLines: { color: '#30363d33' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
-    },
-    rightPriceScale: {
-      borderColor: '#30363d',
-      scaleMargins: { top: 0.08, bottom: 0.08 },
-    },
-    timeScale: {
-      borderColor:     '#30363d',
-      timeVisible:     true,
-      secondsVisible:  false,
-      barSpacing:      10,
-      rightOffset:     6,
-    },
-    handleScroll:   { mouseWheel: true, pressedMouseMove: true },
-    handleScale:    { mouseWheel: true, pinch: true },
-  });
-
-  _demarkSeries = _demarkChart.addCandlestickSeries({
-    upColor:        '#26a69a',
-    downColor:      '#ef5350',
-    borderUpColor:  '#26a69a',
-    borderDownColor:'#ef5350',
-    wickUpColor:    '#26a69a',
-    wickDownColor:  '#ef5350',
-    priceLineVisible: false,
-    lastValueVisible: true,
-  });
-
-  // Per-candle colored data (DeMark heatmap colors from Pine Script)
   _demarkSeries.setData(chartData.map(b => ({
-    time:        b.time,
-    open:        b.open,
-    high:        b.high,
-    low:         b.low,
-    close:       b.close,
-    color:       b.color,
-    wickColor:   b.wickColor,
-    borderColor: b.borderColor,
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
   })));
 
-  // Markers: counts 7-8, 10-12 as small dots; 9 and 13 as arrows
+  // Markers: exhaustion (9/13) as large arrows; approaching (7-8,10-12) as small dots
   const markers = [];
   chartData.forEach(b => {
     if (!b.label) return;
-    const isBuy        = b.buy > 0;
-    const isExhaustion = b.label.startsWith('Long') || b.label.startsWith('Short');
+    const isBuy   = b.buy > 0;
+    const isExhaust = b.label.startsWith('Long') || b.label.startsWith('Short');
     markers.push({
       time:     b.time,
       position: isBuy ? 'belowBar' : 'aboveBar',
-      color:    isExhaustion
-                  ? (isBuy ? '#3fb950' : '#f85149')
-                  : (isBuy ? '#58a6ff' : '#d29922'),
-      shape:    isExhaustion ? (isBuy ? 'arrowUp' : 'arrowDown') : 'circle',
+      color:    isExhaust ? (isBuy ? '#3fb950' : '#f85149') : (isBuy ? '#58a6ff' : '#d29922'),
+      shape:    isExhaust ? (isBuy ? 'arrowUp' : 'arrowDown') : 'circle',
       text:     b.label,
-      size:     isExhaustion ? 2 : 1,
+      size:     isExhaust ? 2.5 : 1.2,
     });
   });
   _demarkSeries.setMarkers(markers);
 
-  _demarkChart.timeScale().fitContent();
+  // Price lines at exhaustion levels (last Long 9/13 and Short 9/13)
+  const exBuy  = chartData.filter(b => b.label?.startsWith('Long')).slice(-1)[0];
+  const exSell = chartData.filter(b => b.label?.startsWith('Short')).slice(-1)[0];
+  if (exBuy)  _demarkSeries.createPriceLine({ price: exBuy.close,  color: '#3fb95066', lineWidth: 1, lineStyle: _styleMap[2], axisLabelVisible: true, title: exBuy.label });
+  if (exSell) _demarkSeries.createPriceLine({ price: exSell.close, color: '#f8514966', lineWidth: 1, lineStyle: _styleMap[2], axisLabelVisible: true, title: exSell.label });
 
-  // Responsive resize
-  const ro = new ResizeObserver(entries => {
-    const w = entries[0].contentRect.width;
-    if (_demarkChart && w > 0) _demarkChart.resize(w, 380);
-  });
+  _addOhlcTooltip(_demarkChart, _demarkSeries, container);
+  _smartZoom(_demarkChart, chartData.length);
+  _charts['demark'] = { chart: _demarkChart, h: H };
+
+  const ro = new ResizeObserver(e => { const w=e[0].contentRect.width; const h=_chartHeight(); if(_demarkChart&&w>0)_demarkChart.resize(w,h); });
   ro.observe(container);
 }
 </script>

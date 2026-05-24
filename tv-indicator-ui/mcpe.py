@@ -232,13 +232,15 @@ def chart_data(bars, results, display_count=80):
         col   = _PHASE_COLOR.get(phase, "#8b949e")
         # Place above for bearish phases, below for bullish
         is_bull = phase in ("Accumulation", "Markup")
+        _ABBREV = {"Markup": "MK↑", "Markdown": "MD↓", "Accumulation": "Acc",
+                   "Distribution": "Dist", "Transition": "Trans"}
         markers.append({
             "time":     r["time"],
             "position": "belowBar" if is_bull else "aboveBar",
             "color":    col,
             "shape":    "arrowUp" if is_bull else "arrowDown",
-            "text":     phase,
-            "size":     1.5,
+            "text":     _ABBREV.get(phase, phase),
+            "size":     2,
         })
     markers.sort(key=lambda m: m["time"])
 
@@ -253,7 +255,7 @@ def chart_data(bars, results, display_count=80):
         {"price": cur["cycle_high"], "color": "#ff5252", "width": 2, "style": 0, "label": f"Cycle High ${cur['cycle_high']:.2f}"},
         {"price": cur["cycle_mid"],  "color": "#7c4dff", "width": 1, "style": 1, "label": "Mid"},
         {"price": cur["cycle_low"],  "color": "#00e676", "width": 2, "style": 0, "label": f"Cycle Low ${cur['cycle_low']:.2f}"},
-        {"price": cur["proj_target"],"color": proj_col,  "width": 2, "style": 2, "label": f"Proj. {proj_pct_str}"},
+        {"price": cur["proj_target"],"color": proj_col,  "width": 2, "style": 0, "label": f"Proj. {proj_pct_str}"},
     ]
 
     return {

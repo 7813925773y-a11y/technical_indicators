@@ -306,6 +306,24 @@ def chart_data(bars, result, display_count=100):
     span_a_data = _line(span_a, start)
     span_b_data = _line(span_b, start)
 
+    # Cloud fill segments: bullish (SpanA>=SpanB, green) / bearish (SpanB>SpanA, red)
+    # Each array holds only the bars belonging to that segment; gaps create proper breaks.
+    cloud_bull_top = []  # SpanA (higher boundary of bull cloud)
+    cloud_bull_bot = []  # SpanB (lower boundary of bull cloud)
+    cloud_bear_top = []  # SpanB (higher boundary of bear cloud)
+    cloud_bear_bot = []  # SpanA (lower boundary of bear cloud)
+    for i in range(start, n):
+        sa, sb = span_a[i], span_b[i]
+        if sa is None or sb is None:
+            continue
+        t = times[i]
+        if sa >= sb:
+            cloud_bull_top.append({"time": t, "value": sa})
+            cloud_bull_bot.append({"time": t, "value": sb})
+        else:
+            cloud_bear_top.append({"time": t, "value": sb})
+            cloud_bear_bot.append({"time": t, "value": sa})
+
     # Chikou: close at bar t displayed at time[t - offset]
     chikou_data = []
     for i in range(start, n):
@@ -408,15 +426,19 @@ def chart_data(bars, result, display_count=100):
     }
 
     return {
-        "bars":        chart_bars,
-        "tenkan":      tenkan_data,
-        "kijun":       kijun_data,
-        "span_a":      span_a_data,
-        "span_b":      span_b_data,
-        "chikou":      chikou_data,
-        "markers":     markers,
-        "price_lines": price_lines,
-        "summary":     summary,
+        "bars":            chart_bars,
+        "tenkan":          tenkan_data,
+        "kijun":           kijun_data,
+        "span_a":          span_a_data,
+        "span_b":          span_b_data,
+        "chikou":          chikou_data,
+        "cloud_bull_top":  cloud_bull_top,
+        "cloud_bull_bot":  cloud_bull_bot,
+        "cloud_bear_top":  cloud_bear_top,
+        "cloud_bear_bot":  cloud_bear_bot,
+        "markers":         markers,
+        "price_lines":     price_lines,
+        "summary":         summary,
     }
 
 
