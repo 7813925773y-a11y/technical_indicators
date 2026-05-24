@@ -95,25 +95,32 @@ async def analyze(request: Request, ticker: str, timeframe: str = "day"):
 
                 briefs      = {}
                 screenshots = {}
+                signals     = {}
 
                 for key, shorttitle, full_title in INDICATORS:
                     yield ev("status", phase=1, step=f"Reading {shorttitle}…")
                     try:
-                        brief_text, shot = await build_brief(
+                        brief_text, screenshot_b64, signal = await build_brief(
                             tv, key, shorttitle, full_title,
                             ticker, timeframe, str(price), today
                         )
                         briefs[f"{key}_brief"] = brief_text
-                        screenshots[key] = f"/screenshots/{Path(shot).name}" if shot else None
+                        screenshots[key]       = screenshot_b64
+                        signals[key]           = signal
                     except Exception as e:
                         logger.warning(f"{shorttitle} brief failed: {e}")
                         briefs[f"{key}_brief"] = f"[Data unavailable: {e}]"
                         screenshots[key]       = None
+                        signals[key]           = {
+                            "indicator": key, "signal": "ERROR",
+                            "reasons": [str(e)], "key_values": {},
+                        }
 
                     yield ev("indicator_ready",
                              key=key, title=shorttitle,
                              brief=briefs[f"{key}_brief"],
-                             screenshot=screenshots[key])
+                             screenshot_b64=screenshots[key],
+                             signal=signals[key])
 
             # ── Phase 2: CrewAI analysis ──────────────────────────────────────
             yield ev("status", phase=2, step="Launching 5-analyst CrewAI crew…")
@@ -134,7 +141,7 @@ async def analyze(request: Request, ticker: str, timeframe: str = "day"):
 
             yield ev("analysis_ready",
                      ticker=ticker, timeframe=timeframe, date=today, price=str(price),
-                     screenshots=screenshots,
+                     signals=signals,
                      analysis=result.get("analysis", ""),
                      model_used=result.get("model_used", ""),
                      fallback_used=result.get("fallback_used", False),

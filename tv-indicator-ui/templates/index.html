@@ -5,296 +5,136 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TV Indicator Analyzer</title>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root {
-    --bg:       #0d1117;
-    --surface:  #161b22;
-    --card:     #1c2128;
-    --border:   #30363d;
-    --accent:   #1f6feb;
-    --green:    #3fb950;
-    --red:      #f85149;
-    --yellow:   #d29922;
-    --muted:    #8b949e;
-    --text:     #c9d1d9;
-    --bright:   #f0f6fc;
-    --radius:   8px;
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --card:    #1c2128;
+    --border:  #30363d;
+    --accent:  #1f6feb;
+    --green:   #3fb950;
+    --red:     #f85149;
+    --yellow:  #d29922;
+    --purple:  #a371f7;
+    --muted:   #8b949e;
+    --text:    #c9d1d9;
+    --bright:  #f0f6fc;
+    --radius:  8px;
     --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; min-height: 100vh; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
-    min-height: 100vh;
-  }
+  /* header */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; color: var(--bright); }
+  .badge { font-size: 11px; background: #1f3a5f; color: #58a6ff; padding: 2px 8px; border-radius: 12px; border: 1px solid #1f6feb55; }
 
-  /* ── header ── */
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--bright);
-  }
-  .badge {
-    font-size: 11px;
-    background: #1f3a5f;
-    color: #58a6ff;
-    padding: 2px 8px;
-    border-radius: 12px;
-    border: 1px solid #1f6feb55;
-  }
-
-  /* ── controls bar ── */
-  .controls {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .controls label {
-    font-size: 12px;
-    color: var(--muted);
-    margin-right: 4px;
-  }
-  .controls input, .controls select {
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--bright);
-    padding: 7px 12px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    outline: none;
-    transition: border-color .15s;
-  }
+  /* controls */
+  .controls { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls label { font-size: 12px; color: var(--muted); margin-right: 4px; }
+  .controls input, .controls select { background: var(--card); border: 1px solid var(--border); color: var(--bright); padding: 7px 12px; border-radius: var(--radius); font-size: 14px; outline: none; transition: border-color .15s; }
   .controls input { width: 110px; font-family: var(--mono); font-weight: 600; letter-spacing: .5px; }
   .controls input:focus, .controls select:focus { border-color: var(--accent); }
-  .controls select { cursor: pointer; }
-
-  #runBtn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    padding: 7px 18px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .15s, opacity .15s;
-  }
-  #runBtn:hover  { background: #388bfd; }
+  #runBtn { background: var(--accent); color: #fff; border: none; padding: 7px 18px; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s; }
+  #runBtn:hover { background: #388bfd; }
   #runBtn:disabled { opacity: .5; cursor: not-allowed; }
 
-  /* ── status banner ── */
-  #statusBar {
-    padding: 10px 24px;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--border);
-    transition: background .3s;
-  }
+  /* status */
+  #statusBar { padding: 10px 24px; font-size: 13px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); transition: background .3s; }
   #statusBar.phase1 { background: #1a2535; color: #58a6ff; }
   #statusBar.phase2 { background: #1a2c1a; color: var(--green); }
   #statusBar.done   { background: #1a2c1a; color: var(--green); }
   #statusBar.error  { background: #2d1a1a; color: var(--red); }
   #statusBar.hidden { display: none; }
-
-  .spinner {
-    width: 14px; height: 14px;
-    border: 2px solid #ffffff33;
-    border-top-color: currentColor;
-    border-radius: 50%;
-    animation: spin .6s linear infinite;
-    flex-shrink: 0;
-  }
+  .spinner { width: 14px; height: 14px; border: 2px solid #ffffff33; border-top-color: currentColor; border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  #priceChip { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--bright); background: var(--card); padding: 4px 10px; border-radius: var(--radius); border: 1px solid var(--border); display: none; }
 
-  /* ── price chip ── */
-  #priceChip {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--bright);
-    background: var(--card);
-    padding: 4px 10px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    display: none;
-  }
-
-  /* ── main layout ── */
+  /* main */
   .main { padding: 20px 24px; }
 
-  /* ── screenshots row ── */
-  #screenshotsRow {
-    display: none;
-    gap: 8px;
-    margin-bottom: 20px;
-    overflow-x: auto;
+  /* signal summary bar (top of results) */
+  #signalSummary { display: none; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .summary-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: .4px;
+    cursor: pointer; transition: opacity .15s;
   }
-  .thumb-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    flex: 0 0 200px;
-    cursor: pointer;
-    transition: border-color .15s;
-  }
-  .thumb-card:hover { border-color: var(--accent); }
-  .thumb-card img {
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-    display: block;
-    background: #0d1117;
-  }
-  .thumb-label {
-    padding: 6px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--muted);
-    text-align: center;
-    letter-spacing: .5px;
-  }
-  .thumb-ready { border-color: #1f6feb55; }
+  .summary-chip:hover { opacity: .8; }
+  .summary-chip .sc-label { font-size: 10px; color: inherit; opacity: .7; margin-right: 2px; }
+  .chip-BULLISH { background: #1a3a1a; color: #3fb950; border: 1px solid #3fb95055; }
+  .chip-BEARISH { background: #3a1a1a; color: #f85149; border: 1px solid #f8514955; }
+  .chip-CAUTION { background: #3a2a0a; color: #d29922; border: 1px solid #d2992255; }
+  .chip-NEUTRAL { background: #1a1f2c; color: #8b949e; border: 1px solid #30363d; }
+  .chip-UNKNOWN, .chip-ERROR { background: #2a1a2a; color: var(--purple); border: 1px solid #a371f755; }
 
-  /* ── tabs ── */
-  .tab-bar {
-    display: flex;
-    gap: 2px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .tab-btn {
-    background: none;
-    border: none;
-    border-bottom: 3px solid transparent;
-    color: var(--muted);
-    padding: 10px 16px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    white-space: nowrap;
-    transition: color .15s, border-color .15s;
-  }
-  .tab-btn:hover   { color: var(--text); }
-  .tab-btn.active  { color: var(--bright); border-bottom-color: var(--accent); }
-  .tab-btn.synth   { color: #d29922; }
+  /* tabs */
+  .tab-bar { display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); padding: 10px 16px; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; transition: color .15s, border-color .15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--bright); border-bottom-color: var(--accent); }
+  .tab-btn.synth { color: #d29922; }
   .tab-btn.synth.active { border-bottom-color: #d29922; color: #e3b341; }
-  .tab-btn .dot {
-    display: inline-block; width: 7px; height: 7px;
-    border-radius: 50%; background: var(--muted);
-    margin-right: 5px; vertical-align: middle;
-    transition: background .2s;
-  }
+  .tab-btn .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 5px; vertical-align: middle; transition: background .2s; }
   .tab-btn.ready .dot { background: var(--green); }
 
-  /* ── tab panels ── */
+  /* panels */
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
-  /* ── indicator card ── */
-  .ind-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-top: 16px;
-    overflow: hidden;
-  }
+  /* indicator card */
+  .ind-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; overflow: hidden; }
 
-  .ind-two-col {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 0;
-  }
-  @media (max-width: 860px) {
-    .ind-two-col { grid-template-columns: 1fr; }
-  }
+  /* signal bar inside each card */
+  .sig-bar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; background: var(--surface); }
+  .sig-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 16px; font-size: 13px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; flex-shrink: 0; }
+  .sig-BULLISH { background: #1a3a1a; color: #3fb950; border: 1px solid #3fb95055; }
+  .sig-BEARISH { background: #3a1a1a; color: #f85149; border: 1px solid #f8514955; }
+  .sig-CAUTION { background: #3a2a0a; color: #d29922; border: 1px solid #d2992255; }
+  .sig-NEUTRAL { background: #1a1f2c; color: #8b949e; border: 1px solid #30363d; }
+  .sig-UNKNOWN, .sig-ERROR { background: #2a1a2a; color: var(--purple); border: 1px solid #a371f755; }
+  .sig-reasons { font-size: 12px; color: var(--muted); line-height: 1.6; flex: 1; }
+  .sig-reasons span { display: block; }
 
-  .ind-screenshot {
-    border-right: 1px solid var(--border);
-    padding: 12px;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    background: #0d1117;
-  }
-  .ind-screenshot img {
-    width: 100%;
-    border-radius: 4px;
-    object-fit: contain;
-    max-height: 320px;
-  }
-  .ind-screenshot .no-shot {
-    color: var(--muted);
-    font-size: 12px;
-    padding: 40px 0;
-    text-align: center;
-  }
+  /* key-values table */
+  .kv-table { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
+  .kv-item { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; }
+  .kv-key { color: var(--muted); }
+  .kv-val { color: var(--bright); font-family: var(--mono); font-weight: 600; }
 
-  .ind-content { padding: 16px 20px; overflow: hidden; }
-  .ind-title {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
+  /* two-col layout */
+  .ind-two-col { display: grid; grid-template-columns: 380px 1fr; }
+  @media (max-width: 860px) { .ind-two-col { grid-template-columns: 1fr; } }
 
-  .brief-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px 14px;
-    font-family: var(--mono);
-    font-size: 12px;
-    color: #8b949e;
-    line-height: 1.6;
-    max-height: 180px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    margin-bottom: 14px;
-  }
+  /* screenshot pane */
+  .ind-screenshot { border-right: 1px solid var(--border); background: #090d12; display: flex; align-items: flex-start; justify-content: center; padding: 8px; min-height: 200px; }
+  .ind-screenshot img { width: 100%; object-fit: contain; max-height: 340px; border-radius: 4px; display: block; }
+  .no-shot { color: var(--muted); font-size: 12px; text-align: center; padding: 60px 20px; align-self: center; }
 
-  .analysis-section h3 {
-    font-size: 13px;
-    color: var(--bright);
-    margin-bottom: 6px;
-  }
-  .analysis-section .waiting {
-    color: var(--muted);
-    font-size: 12px;
-    font-style: italic;
-  }
+  /* content pane */
+  .ind-content { padding: 14px 18px; overflow: hidden; }
+  .ind-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 
-  /* markdown rendered output */
+  details.brief-details { margin-bottom: 12px; }
+  details.brief-details summary { cursor: pointer; font-size: 11px; color: var(--muted); user-select: none; margin-bottom: 4px; }
+  details.brief-details summary:hover { color: var(--text); }
+  .brief-block { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: #8b949e; line-height: 1.6; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+
+  .analysis-section h3 { font-size: 13px; color: var(--bright); margin-bottom: 6px; }
+  .waiting { color: var(--muted); font-size: 12px; font-style: italic; }
+
+  /* markdown */
   .md-content { line-height: 1.65; color: var(--text); }
   .md-content h1,.md-content h2 { color: var(--bright); margin: 12px 0 6px; font-size: 15px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
   .md-content h3,.md-content h4 { color: var(--bright); margin: 10px 0 4px; font-size: 14px; }
-  .md-content p   { margin: 6px 0; }
+  .md-content p { margin: 6px 0; }
   .md-content ul,.md-content ol { padding-left: 20px; margin: 6px 0; }
-  .md-content li  { margin: 3px 0; }
+  .md-content li { margin: 3px 0; }
   .md-content code { background: var(--surface); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: 12px; color: #e6edf3; }
-  .md-content pre  { background: var(--surface); padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
+  .md-content pre { background: var(--surface); padding: 12px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }
   .md-content strong { color: var(--bright); }
   .md-content blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted); }
   .md-content hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
@@ -302,82 +142,198 @@
   .md-content th,.md-content td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
   .md-content th { background: var(--surface); color: var(--bright); }
 
-  /* ── synthesis panel ── */
-  #synthPanel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-top: 16px;
-    padding: 20px 24px;
-  }
-  .synth-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-  }
+  /* synthesis panel */
+  #synthPanel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; padding: 20px 24px; }
+  .synth-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
   .synth-header h2 { font-size: 15px; color: var(--bright); }
-  .model-badge {
-    font-size: 11px;
-    background: var(--surface);
-    color: var(--muted);
-    padding: 3px 9px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-  }
+  .model-badge { font-size: 11px; background: var(--surface); color: var(--muted); padding: 3px 9px; border-radius: 10px; border: 1px solid var(--border); }
   .model-badge.fallback { color: var(--yellow); border-color: #d2992233; }
 
-  /* ── log panel (collapsible) ── */
-  #logToggle {
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 12px;
-    padding: 8px 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 12px;
-  }
+  /* log */
+  #logToggle { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 8px 0; display: flex; align-items: center; gap: 4px; margin-top: 12px; }
   #logToggle:hover { color: var(--text); }
-  #eventLog {
-    display: none;
-    background: var(--surface);
-    border: 1px solid var(--border);
+  #eventLog { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.7; max-height: 220px; overflow-y: auto; margin-top: 6px; }
+  .log-line { margin: 1px 0; }
+  .log-line.info { color: #58a6ff; }
+  .log-line.ok   { color: var(--green); }
+  .log-line.warn { color: var(--yellow); }
+  .log-line.err  { color: var(--red); }
+
+  /* empty state */
+  #emptyState { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 24px; color: var(--muted); text-align: center; }
+  #emptyState .icon { font-size: 40px; margin-bottom: 12px; }
+  #emptyState p { max-width: 380px; line-height: 1.6; }
+
+  #resultsWrap { display: none; }
+
+  /* DeMark chart pane */
+  .demark-chart-wrap {
+    background: #090d12;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 8px;
+  }
+  #demark-chart-container {
+    width: 100%;
+    height: 380px;
     border-radius: 4px;
-    padding: 10px 12px;
-    font-family: var(--mono);
+    overflow: hidden;
+  }
+  .demark-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 6px 0 2px;
     font-size: 11px;
     color: var(--muted);
-    line-height: 1.7;
-    max-height: 220px;
-    overflow-y: auto;
-    margin-top: 6px;
   }
-  .log-line { margin: 1px 0; }
-  .log-line.info  { color: #58a6ff; }
-  .log-line.ok    { color: var(--green); }
-  .log-line.warn  { color: var(--yellow); }
-  .log-line.err   { color: var(--red); }
+  .demark-legend span { display: flex; align-items: center; gap: 5px; }
+  .leg-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 
-  /* ── empty state ── */
-  #emptyState {
+  /* FibStruct chart pane */
+  .fibstruct-chart-wrap {
+    background: #090d12;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 8px;
+  }
+  #fibstruct-chart-container {
+    width: 100%;
+    height: 420px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .fibstruct-legend {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 6px 0 2px;
+    font-size: 11px;
     color: var(--muted);
-    text-align: center;
   }
-  #emptyState .icon { font-size: 40px; margin-bottom: 12px; }
-  #emptyState p { max-width: 360px; line-height: 1.6; }
+  .fibstruct-legend span { display: flex; align-items: center; gap: 5px; }
+  .fibstruct-zone-bar {
+    display: flex;
+    gap: 12px;
+    padding: 5px 0 0;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .fib-zone-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 10px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .fib-zone-golden { background: #2a2200; color: #ffd600; border: 1px solid #ffd60033; }
+  .fib-zone-target-bull { background: #0a2a0a; color: #00e676; border: 1px solid #00e67633; }
+  .fib-zone-target-bear { background: #2a0a0a; color: #ff5252; border: 1px solid #ff525233; }
 
-  /* ── results wrapper ── */
-  #resultsWrap { display: none; }
+  /* MCPE chart pane */
+  .mcpe-chart-wrap {
+    background: #090d12;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 8px;
+  }
+  #mcpe-chart-container {
+    width: 100%;
+    height: 420px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .mcpe-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 6px 0 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .mcpe-legend span { display: flex; align-items: center; gap: 5px; }
+  .mcpe-summary-bar {
+    display: flex;
+    gap: 12px;
+    padding: 5px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .mcpe-stat { display: flex; gap: 4px; align-items: center; }
+  .mcpe-stat-label { color: var(--muted); }
+  .mcpe-stat-val { font-family: var(--mono); color: var(--bright); font-weight: 600; }
+
+  /* Harmonic chart pane */
+  .harmonic-chart-wrap {
+    background: #090d12;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 8px;
+  }
+  #harmonic-chart-container {
+    width: 100%;
+    height: 420px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .harmonic-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 6px 0 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .harmonic-legend span { display: flex; align-items: center; gap: 5px; }
+  .harmonic-prz-bar {
+    display: flex;
+    gap: 12px;
+    padding: 5px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .hav-prz-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .hav-chip-bull { background: #0a2a25; color: #00c896; border: 1px solid #00c89633; }
+  .hav-chip-bear { background: #2a0a0a; color: #ef5350; border: 1px solid #ef535033; }
+  .hav-chip-prz  { background: #1a1f2c; color: #d29922; border: 1px solid #d2992233; }
+  .hav-chip-in   { background: #2a2200; color: #ffd600; border: 1px solid #ffd60055; font-weight: 700; }
+
+  /* Ichimoku chart pane */
+  .ichimoku-chart-wrap {
+    background: #090d12;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px 8px;
+  }
+  #ichimoku-chart-container {
+    width: 100%;
+    height: 460px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .ichimoku-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 6px 0 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .ichimoku-legend span { display: flex; align-items: center; gap: 5px; }
+  .ichimoku-summary-bar {
+    display: flex;
+    gap: 12px;
+    padding: 5px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .ichi-stat { display: flex; gap: 4px; align-items: center; }
+  .ichi-stat-label { color: var(--muted); }
+  .ichi-stat-val { font-family: var(--mono); color: var(--bright); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -408,21 +364,14 @@
 </div>
 
 <div class="main">
-  <!-- empty state -->
   <div id="emptyState">
     <div class="icon">🔍</div>
-    <p>Enter a ticker and timeframe, then click <strong>Run Analysis</strong> to read all 5 indicators from your live TradingView chart and generate a synthesized trade recommendation.</p>
-    <p style="margin-top:10px; font-size:12px;">Requires TradingView Desktop running with CDP enabled.</p>
+    <p>Enter a ticker and timeframe, then click <strong>Run Analysis</strong> to read all 5 indicators from your live TradingView chart.</p>
+    <p style="margin-top:10px; font-size:12px; color:var(--muted)">Requires TradingView Desktop running with CDP enabled.</p>
   </div>
 
-  <!-- screenshots -->
-  <div id="screenshotsRow">
-    <div id="thumb-mcpe"      class="thumb-card"><img src="" alt="MCPE"><div class="thumb-label">MCPE</div></div>
-    <div id="thumb-harmonic"  class="thumb-card"><img src="" alt="HAV"><div class="thumb-label">Harmonic</div></div>
-    <div id="thumb-ichimoku"  class="thumb-card"><img src="" alt="Ichimoku"><div class="thumb-label">Ichimoku</div></div>
-    <div id="thumb-fibstruct" class="thumb-card"><img src="" alt="FibStruct"><div class="thumb-label">FibStruct</div></div>
-    <div id="thumb-demark"    class="thumb-card"><img src="" alt="DeMark"><div class="thumb-label">DeMark</div></div>
-  </div>
+  <!-- signal summary chips — populated as indicators arrive -->
+  <div id="signalSummary"></div>
 
   <div id="resultsWrap">
     <!-- tab bar -->
@@ -435,14 +384,174 @@
       <button class="tab-btn synth"  id="tab-btn-synthesis"  onclick="showTab('synthesis')"> ★ Synthesis</button>
     </div>
 
-    <!-- indicator panels -->
-    <div id="panel-mcpe"      class="tab-panel active"><div class="ind-card"><div class="ind-two-col"><div class="ind-screenshot" id="shot-mcpe"><div class="no-shot">Screenshot will appear here</div></div><div class="ind-content"><div class="ind-title">MCPE — Market Cycle Projection Engine</div><div class="brief-block" id="brief-mcpe">Waiting for data…</div><div class="analysis-section"><h3>Wyckoff Cycle Analysis</h3><div id="analysis-mcpe" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div></div></div></div></div></div>
-    <div id="panel-harmonic"  class="tab-panel"><div class="ind-card"><div class="ind-two-col"><div class="ind-screenshot" id="shot-harmonic"><div class="no-shot">Screenshot will appear here</div></div><div class="ind-content"><div class="ind-title">HAV — Harmonic Auto-Validator</div><div class="brief-block" id="brief-harmonic">Waiting for data…</div><div class="analysis-section"><h3>Harmonic Pattern Analysis</h3><div id="analysis-harmonic" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div></div></div></div></div></div>
-    <div id="panel-ichimoku"  class="tab-panel"><div class="ind-card"><div class="ind-two-col"><div class="ind-screenshot" id="shot-ichimoku"><div class="no-shot">Screenshot will appear here</div></div><div class="ind-content"><div class="ind-title">Ichimoku Theories [LuxAlgo]</div><div class="brief-block" id="brief-ichimoku">Waiting for data…</div><div class="analysis-section"><h3>Ichimoku + Time/Wave/Price Theory</h3><div id="analysis-ichimoku" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div></div></div></div></div></div>
-    <div id="panel-fibstruct" class="tab-panel"><div class="ind-card"><div class="ind-two-col"><div class="ind-screenshot" id="shot-fibstruct"><div class="no-shot">Screenshot will appear here</div></div><div class="ind-content"><div class="ind-title">FibStruct — Fibonacci Structure Engine</div><div class="brief-block" id="brief-fibstruct">Waiting for data…</div><div class="analysis-section"><h3>SMC + Fibonacci Confluence</h3><div id="analysis-fibstruct" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div></div></div></div></div></div>
-    <div id="panel-demark"    class="tab-panel"><div class="ind-card"><div class="ind-two-col"><div class="ind-screenshot" id="shot-demark"><div class="no-shot">Screenshot will appear here</div></div><div class="ind-content"><div class="ind-title">Tom DeMark Sequential Heatmap</div><div class="brief-block" id="brief-demark">Waiting for data…</div><div class="analysis-section"><h3>TD Sequential Exhaustion</h3><div id="analysis-demark" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div></div></div></div></div></div>
+    <!-- MCPE panel — chart replaces screenshot -->
+    <div id="panel-mcpe" class="tab-panel active">
+      <div class="ind-card">
+        <div class="sig-bar" id="sigbar-mcpe">
+          <span class="sig-badge sig-NEUTRAL">— Waiting</span>
+        </div>
+        <!-- Cycle summary stats bar — populated by renderMcpeChart -->
+        <div id="mcpe-summary" style="display:none" class="mcpe-summary-bar"></div>
+        <!-- full-width Lightweight Charts candlestick -->
+        <div class="mcpe-chart-wrap">
+          <div id="mcpe-chart-container"></div>
+          <div class="mcpe-legend">
+            <span><span class="leg-swatch" style="background:#00e676"></span>Markup — LR slope↑ + ATR expanding</span>
+            <span><span class="leg-swatch" style="background:#00bcd4"></span>Accumulation — flat slope, lower range</span>
+            <span><span class="leg-swatch" style="background:#ff9800"></span>Distribution — flat slope, upper range</span>
+            <span><span class="leg-swatch" style="background:#ff5252"></span>Markdown — LR slope↓ + ATR expanding</span>
+            <span><span class="leg-swatch" style="background:#7c4dff"></span>Transition — mixed signals</span>
+          </div>
+        </div>
+        <div class="ind-content">
+          <div class="ind-title">MCPE — Market Cycle Projection Engine</div>
+          <details class="brief-details">
+            <summary>▶ Computed data (OHLCV-based)</summary>
+            <div class="brief-block" id="brief-mcpe">Waiting for data…</div>
+          </details>
+          <div class="analysis-section">
+            <h3>Wyckoff Cycle Analysis</h3>
+            <div id="analysis-mcpe" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- synthesis panel -->
+    <!-- Harmonic panel — chart replaces screenshot -->
+    <div id="panel-harmonic" class="tab-panel">
+      <div class="ind-card">
+        <div class="sig-bar" id="sigbar-harmonic">
+          <span class="sig-badge sig-NEUTRAL">— Waiting</span>
+        </div>
+        <!-- PRZ info bar — populated by renderHarmonicChart -->
+        <div id="harmonic-prz-bar" style="display:none" class="harmonic-prz-bar"></div>
+        <!-- full-width Lightweight Charts candlestick -->
+        <div class="harmonic-chart-wrap">
+          <div id="harmonic-chart-container"></div>
+          <div class="harmonic-legend">
+            <span><span class="leg-swatch" style="background:#00c896; border-radius:50%"></span>▲ D — Bullish reversal zone (XABCD)</span>
+            <span><span class="leg-swatch" style="background:#ef5350; border-radius:50%"></span>▼ D — Bearish reversal zone (XABCD)</span>
+            <span><span class="leg-swatch" style="background:#8b949e; border-radius:50%"></span>● X/A/B/C — Zigzag pivots</span>
+            <span><span class="leg-swatch" style="background:#d29922"></span>── PRZ zone (top/bot/mid)</span>
+            <span style="color:var(--muted)">No patterns = fewer than 5–7 pivots qualify (normal on daily TF)</span>
+          </div>
+        </div>
+        <div class="ind-content">
+          <div class="ind-title">HAV — Harmonic Auto-Validator [GBB]</div>
+          <details class="brief-details">
+            <summary>▶ Computed data (OHLCV-based)</summary>
+            <div class="brief-block" id="brief-harmonic">Waiting for data…</div>
+          </details>
+          <div class="analysis-section">
+            <h3>Harmonic Pattern Analysis</h3>
+            <div id="analysis-harmonic" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ichimoku panel — chart replaces screenshot -->
+    <div id="panel-ichimoku" class="tab-panel">
+      <div class="ind-card">
+        <div class="sig-bar" id="sigbar-ichimoku">
+          <span class="sig-badge sig-NEUTRAL">— Waiting</span>
+        </div>
+        <!-- Ichimoku summary stats bar — populated by renderIchimokuChart -->
+        <div id="ichimoku-summary" style="display:none" class="ichimoku-summary-bar"></div>
+        <!-- full-width Lightweight Charts: candles + 5 Ichimoku lines -->
+        <div class="ichimoku-chart-wrap">
+          <div id="ichimoku-chart-container"></div>
+          <div class="ichimoku-legend">
+            <span><span class="leg-swatch" style="background:#00c896"></span>Above kumo — bullish</span>
+            <span><span class="leg-swatch" style="background:#ef5350"></span>Below kumo — bearish</span>
+            <span><span class="leg-swatch" style="background:#7c4dff"></span>Inside kumo — neutral</span>
+            <span><span class="leg-swatch" style="background:#26a69a; height:2px"></span>Tenkan Sen (9)</span>
+            <span><span class="leg-swatch" style="background:#ef5350; height:2px"></span>Kijun Sen (26)</span>
+            <span><span class="leg-swatch" style="background:#00c896; height:2px; opacity:0.6"></span>Span A</span>
+            <span><span class="leg-swatch" style="background:#ef5350; height:2px; opacity:0.6"></span>Span B</span>
+          </div>
+        </div>
+        <div class="ind-content">
+          <div class="ind-title">Ichimoku Theories [LuxAlgo]</div>
+          <details class="brief-details">
+            <summary>▶ Computed data (OHLCV-based)</summary>
+            <div class="brief-block" id="brief-ichimoku">Waiting for data…</div>
+          </details>
+          <div class="analysis-section">
+            <h3>Ichimoku + Time/Wave/Price Theory</h3>
+            <div id="analysis-ichimoku" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FibStruct panel — chart replaces screenshot -->
+    <div id="panel-fibstruct" class="tab-panel">
+      <div class="ind-card">
+        <div class="sig-bar" id="sigbar-fibstruct">
+          <span class="sig-badge sig-NEUTRAL">— Waiting</span>
+        </div>
+        <!-- Zone info bar — populated by renderFibStructChart -->
+        <div id="fibstruct-zones" style="display:none; padding:6px 16px; border-bottom:1px solid var(--border); background:var(--surface);">
+          <div class="fibstruct-zone-bar" id="fibstruct-zone-chips"></div>
+        </div>
+        <!-- full-width Lightweight Charts candlestick -->
+        <div class="fibstruct-chart-wrap">
+          <div id="fibstruct-chart-container"></div>
+          <div class="fibstruct-legend">
+            <span><span class="leg-swatch" style="background:#4dd0e1"></span>CHoCH — Change of Character (reversal)</span>
+            <span><span class="leg-swatch" style="background:#29b6f6"></span>BOS — Break of Structure (continuation)</span>
+            <span><span class="leg-swatch" style="background:#00e676; border-radius:50%"></span>▲ BUY signal</span>
+            <span><span class="leg-swatch" style="background:#ff5252; border-radius:50%"></span>▼ SELL signal</span>
+            <span><span class="leg-swatch" style="background:#ffd600"></span>── 0.618 Golden Ratio</span>
+            <span><span class="leg-swatch" style="background:#ff9100; border-radius:50%"></span>● Liquidity Sweep</span>
+          </div>
+        </div>
+        <div class="ind-content">
+          <div class="ind-title">FibStruct — Fibonacci Structure Engine [WillyAlgoTrader]</div>
+          <details class="brief-details">
+            <summary>▶ Computed data (OHLCV-based)</summary>
+            <div class="brief-block" id="brief-fibstruct">Waiting for data…</div>
+          </details>
+          <div class="analysis-section">
+            <h3>SMC + Fibonacci Confluence</h3>
+            <div id="analysis-fibstruct" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DeMark panel — chart replaces screenshot -->
+    <div id="panel-demark" class="tab-panel">
+      <div class="ind-card">
+        <div class="sig-bar" id="sigbar-demark">
+          <span class="sig-badge sig-NEUTRAL">— Waiting</span>
+        </div>
+        <!-- full-width Lightweight Charts candlestick -->
+        <div class="demark-chart-wrap">
+          <div id="demark-chart-container"></div>
+          <div class="demark-legend">
+            <span><span class="leg-swatch" style="background:#0f44f5"></span>Buy setup (downtrend) — blue deepens to count 13</span>
+            <span><span class="leg-swatch" style="background:#f25811"></span>Sell setup (uptrend) — orange/red deepens to count 13</span>
+            <span><span class="leg-swatch" style="background:#3fb950; border-radius:50%"></span>▲ Long 9/13 exhaustion (buy zone)</span>
+            <span><span class="leg-swatch" style="background:#f85149; border-radius:50%"></span>▼ Short 9/13 exhaustion (sell zone)</span>
+          </div>
+        </div>
+        <div class="ind-content">
+          <div class="ind-title">Tom DeMark Sequential Heatmap</div>
+          <details class="brief-details">
+            <summary>▶ Computed counts (OHLCV-based)</summary>
+            <div class="brief-block" id="brief-demark">Waiting for data…</div>
+          </details>
+          <div class="analysis-section">
+            <h3>TD Sequential Exhaustion</h3>
+            <div id="analysis-demark" class="md-content"><span class="waiting">Waiting for CrewAI…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Synthesis panel -->
     <div id="panel-synthesis" class="tab-panel">
       <div id="synthPanel">
         <div class="synth-header">
@@ -450,15 +559,12 @@
           <span id="modelBadge" class="model-badge" style="display:none"></span>
         </div>
         <div id="synthesis-content" class="md-content">
-          <span class="waiting" style="color:var(--muted); font-style:italic;">
-            Waiting for 5-analyst CrewAI synthesis…
-          </span>
+          <span class="waiting">Waiting for 5-analyst CrewAI synthesis…</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- event log -->
   <button id="logToggle" onclick="toggleLog()" style="display:none">▶ Event log</button>
   <div id="eventLog"></div>
 </div>
@@ -470,7 +576,12 @@ let currentES = null;
 let activeTab = 'mcpe';
 let logOpen   = false;
 
-// ── Analysis ────────────────────────────────────────────────────────────────
+const SIG_ICON = { BULLISH: '▲', BEARISH: '▼', CAUTION: '⚠', NEUTRAL: '—', UNKNOWN: '?', ERROR: '✗' };
+const IND_LABELS = {
+  mcpe: 'MCPE', harmonic: 'HAV', ichimoku: 'Ichimoku', fibstruct: 'FibStruct', demark: 'DeMark'
+};
+
+// ── Analysis ─────────────────────────────────────────────────────────────────
 
 function startAnalysis() {
   const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
@@ -479,28 +590,49 @@ function startAnalysis() {
 
   if (currentES) { currentES.close(); currentES = null; }
 
-  // Reset UI
-  document.getElementById('emptyState').style.display    = 'none';
-  document.getElementById('resultsWrap').style.display   = 'block';
-  document.getElementById('screenshotsRow').style.display = 'flex';
+  document.getElementById('emptyState').style.display     = 'none';
+  document.getElementById('resultsWrap').style.display    = 'block';
+  document.getElementById('signalSummary').style.display  = 'flex';
+  document.getElementById('signalSummary').innerHTML      = '';
   document.getElementById('runBtn').disabled = true;
   document.getElementById('logToggle').style.display = 'flex';
   document.getElementById('eventLog').innerHTML = '';
   document.getElementById('priceChip').style.display = 'none';
   document.getElementById('modelBadge').style.display = 'none';
 
-  // Reset all briefs + analyses
   ['mcpe','harmonic','ichimoku','fibstruct','demark'].forEach(k => {
     document.getElementById(`brief-${k}`).textContent = 'Waiting for data…';
     document.getElementById(`analysis-${k}`).innerHTML = '<span class="waiting">Waiting for CrewAI…</span>';
-    const shot = document.getElementById(`shot-${k}`);
-    shot.innerHTML = '<div class="no-shot">Screenshot will appear here</div>';
-    document.getElementById(`thumb-${k}`).querySelector('img').src = '';
+    document.getElementById(`sigbar-${k}`).innerHTML = '<span class="sig-badge sig-NEUTRAL">— Waiting</span>';
     document.getElementById(`tab-btn-${k}`).classList.remove('ready');
-    document.getElementById(`thumb-${k}`).classList.remove('thumb-ready');
+    const shot = document.getElementById(`shot-${k}`);
+    if (shot) shot.innerHTML = '<div class="no-shot">Chart screenshot will appear here</div>';
   });
+  // reset mcpe chart
+  if (_mcpeChart) { _mcpeChart.remove(); _mcpeChart = null; _mcpeSeries = null; }
+  document.getElementById('mcpe-chart-container').innerHTML = '';
+  document.getElementById('mcpe-summary').style.display = 'none';
+  document.getElementById('mcpe-summary').innerHTML = '';
+  // reset harmonic chart
+  if (_harmonicChart) { _harmonicChart.remove(); _harmonicChart = null; _harmonicSeries = null; }
+  document.getElementById('harmonic-chart-container').innerHTML = '';
+  document.getElementById('harmonic-prz-bar').style.display = 'none';
+  document.getElementById('harmonic-prz-bar').innerHTML = '';
+  // reset ichimoku chart
+  if (_ichimokuChart) { _ichimokuChart.remove(); _ichimokuChart = null; _ichimokuSeries = null; }
+  document.getElementById('ichimoku-chart-container').innerHTML = '';
+  document.getElementById('ichimoku-summary').style.display = 'none';
+  document.getElementById('ichimoku-summary').innerHTML = '';
+  // reset demark chart
+  if (_demarkChart) { _demarkChart.remove(); _demarkChart = null; _demarkSeries = null; }
+  document.getElementById('demark-chart-container').innerHTML = '';
+  // reset fibstruct chart
+  if (_fibStructChart) { _fibStructChart.remove(); _fibStructChart = null; _fibStructSeries = null; }
+  document.getElementById('fibstruct-chart-container').innerHTML = '';
+  document.getElementById('fibstruct-zones').style.display = 'none';
+  document.getElementById('fibstruct-zone-chips').innerHTML = '';
   document.getElementById('synthesis-content').innerHTML =
-    '<span class="waiting" style="color:var(--muted);font-style:italic;">Waiting for 5-analyst CrewAI synthesis…</span>';
+    '<span class="waiting">Waiting for 5-analyst CrewAI synthesis…</span>';
 
   setStatus('phase1', '⟳ Connecting…');
   showTab('mcpe');
@@ -509,8 +641,7 @@ function startAnalysis() {
 
   currentES.addEventListener('status', e => {
     const d = JSON.parse(e.data);
-    const cls = d.phase === 2 ? 'phase2' : 'phase1';
-    setStatus(cls, d.step);
+    setStatus(d.phase === 2 ? 'phase2' : 'phase1', d.step);
     addLog('info', d.step);
   });
 
@@ -523,32 +654,53 @@ function startAnalysis() {
 
   currentES.addEventListener('indicator_ready', e => {
     const d = JSON.parse(e.data);
-    const { key, brief, screenshot } = d;
+    const { key, brief, screenshot_b64, signal } = d;
 
-    // Brief
+    // Raw brief (collapsed by default)
     document.getElementById(`brief-${key}`).textContent = brief;
 
-    // Screenshot
-    if (screenshot) {
-      document.getElementById(`shot-${key}`).innerHTML =
-        `<img src="${screenshot}?t=${Date.now()}" alt="${key}">`;
-      const img = document.getElementById(`thumb-${key}`).querySelector('img');
-      img.src = `${screenshot}?t=${Date.now()}`;
-      document.getElementById(`thumb-${key}`).classList.add('thumb-ready');
-      document.getElementById(`thumb-${key}`).onclick = () => {
-        showTab(key);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      };
+    // Screenshot — base64 embedded (MCPE + Harmonic + DeMark + FibStruct use computed charts)
+    if (screenshot_b64 && key !== 'mcpe' && key !== 'harmonic' && key !== 'ichimoku' && key !== 'demark' && key !== 'fibstruct') {
+      const src = `data:image/png;base64,${screenshot_b64}`;
+      document.getElementById(`shot-${key}`).innerHTML = `<img src="${src}" alt="${key} chart">`;
     }
+
+    // Signal bar
+    renderSignalBar(key, signal);
+
+    // MCPE: render Lightweight Chart
+    if (key === 'mcpe' && signal && signal.chart_data) {
+      renderMcpeChart(signal.chart_data);
+    }
+    // Harmonic: render Lightweight Chart
+    if (key === 'harmonic' && signal && signal.chart_data) {
+      renderHarmonicChart(signal.chart_data);
+    }
+    // Ichimoku: render Lightweight Chart
+    if (key === 'ichimoku' && signal && signal.chart_data) {
+      renderIchimokuChart(signal.chart_data);
+    }
+    // DeMark: render Lightweight Chart
+    if (key === 'demark' && signal && signal.chart_data) {
+      renderDemarkChart(signal.chart_data);
+    }
+    // FibStruct: render Lightweight Chart
+    if (key === 'fibstruct' && signal && signal.chart_data) {
+      renderFibStructChart(signal.chart_data);
+    }
+
+    // Summary chip at top
+    addSummaryChip(key, signal);
+
     document.getElementById(`tab-btn-${key}`).classList.add('ready');
-    addLog('ok', `✓ ${d.title} brief ready`);
+    addLog('ok', `✓ ${d.title} → ${signal ? signal.signal : '?'}`);
   });
 
   currentES.addEventListener('analysis_ready', e => {
     const d = JSON.parse(e.data);
     populateAnalysis(d);
     addLog('ok', `✓ Analysis complete — model: ${d.model_used}`);
-    if (d.fallback_used) addLog('warn', `⚠ Fallback was used (${d.crew_error || ''})`);
+    if (d.fallback_used) addLog('warn', `⚠ Fallback used (${d.crew_error || ''})`);
   });
 
   currentES.addEventListener('done', e => {
@@ -569,63 +721,91 @@ function startAnalysis() {
     if (currentES) { currentES.close(); currentES = null; }
   });
 
-  // SSE connection-level error (network issue)
-  currentES.onerror = () => {
-    if (currentES && currentES.readyState === EventSource.CLOSED) {
-      // already handled
-    }
-  };
+  currentES.onerror = () => {};
 }
 
-// ── Populate analysis results ────────────────────────────────────────────────
+// ── Signal rendering ─────────────────────────────────────────────────────────
+
+function renderSignalBar(key, sig) {
+  if (!sig) return;
+  const bias = sig.signal || 'UNKNOWN';
+  const icon = SIG_ICON[bias] || '?';
+
+  const reasonsHtml = (sig.reasons || [])
+    .map(r => `<span>• ${r}</span>`)
+    .join('');
+
+  const kvHtml = Object.entries(sig.key_values || {}).length
+    ? '<div class="kv-table">' +
+        Object.entries(sig.key_values).map(([k, v]) =>
+          `<span class="kv-item"><span class="kv-key">${k}</span><span class="kv-val">${v}</span></span>`
+        ).join('') +
+      '</div>'
+    : '';
+
+  document.getElementById(`sigbar-${key}`).innerHTML = `
+    <span class="sig-badge sig-${bias}">${icon} ${bias}</span>
+    <div style="flex:1">
+      <div class="sig-reasons">${reasonsHtml}</div>
+      ${kvHtml}
+    </div>
+  `;
+}
+
+function addSummaryChip(key, sig) {
+  if (!sig) return;
+  const bias  = sig.signal || 'UNKNOWN';
+  const icon  = SIG_ICON[bias] || '?';
+  const label = IND_LABELS[key] || key;
+  const chip  = document.createElement('div');
+  chip.className = `summary-chip chip-${bias}`;
+  chip.innerHTML = `<span class="sc-label">${label}</span> ${icon} ${bias}`;
+  chip.onclick = () => showTab(key);
+  chip.title = (sig.reasons || []).join(' | ');
+  document.getElementById('signalSummary').appendChild(chip);
+}
+
+// ── Populate analysis from CrewAI ────────────────────────────────────────────
 
 function populateAnalysis(d) {
   const analysis = d.analysis || '';
 
-  // Split analysis into per-indicator sections
   const sections = {
     mcpe:      extractSection(analysis, 'MCPE Verdict'),
     harmonic:  extractSection(analysis, 'Harmonic Verdict'),
     ichimoku:  extractSection(analysis, 'Ichimoku Verdict'),
     fibstruct: extractSection(analysis, 'FibStruct Verdict'),
     demark:    extractSection(analysis, 'DeMark Verdict'),
-    synthesis: extractSection(analysis, 'Synthesized Recommendation') || extractSection(analysis, 'Bottom Line'),
+    synthesis: extractSection(analysis, 'Synthesized Recommendation') ||
+               extractSection(analysis, 'Bottom Line') ||
+               analysis,
   };
 
-  // If no sections found (direct synthesis format), show full text under synthesis
-  const hasAnySection = Object.values(sections).some(Boolean);
-  if (!hasAnySection) {
-    sections.synthesis = analysis;
-  }
-
   ['mcpe','harmonic','ichimoku','fibstruct','demark'].forEach(k => {
-    const el = document.getElementById(`analysis-${k}`);
-    el.innerHTML = sections[k] ? marked.parse(sections[k]) : '<span class="waiting" style="color:var(--muted)">No dedicated verdict in output</span>';
+    document.getElementById(`analysis-${k}`).innerHTML =
+      sections[k]
+        ? marked.parse(sections[k])
+        : '<span class="waiting" style="color:var(--muted)">Included in synthesis tab</span>';
   });
 
-  // Full analysis under synthesis tab
-  const synthEl = document.getElementById('synthesis-content');
-  synthEl.innerHTML = marked.parse(sections.synthesis || analysis);
+  document.getElementById('synthesis-content').innerHTML = marked.parse(sections.synthesis || analysis);
 
-  // Model badge
   const badge = document.getElementById('modelBadge');
-  badge.textContent = d.model_used || '';
-  badge.className   = 'model-badge' + (d.fallback_used ? ' fallback' : '');
+  badge.textContent  = d.model_used || '';
+  badge.className    = 'model-badge' + (d.fallback_used ? ' fallback' : '');
   badge.style.display = d.model_used ? 'block' : 'none';
 
-  // Switch to synthesis tab
   showTab('synthesis');
 }
 
 function extractSection(text, heading) {
-  // Match "## Heading..." through the next "## " or end of string
-  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`#{1,3}\\s*${escaped}[\\s\\S]*?(?=\\n#{1,3}\\s|$)`, 'i');
-  const m  = text.match(re);
+  const esc = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re  = new RegExp(`#{1,3}\\s*${esc}[\\s\\S]*?(?=\\n#{1,3}\\s|$)`, 'i');
+  const m   = text.match(re);
   return m ? m[0].trim() : null;
 }
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────────────────────
 
 function showTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -635,23 +815,23 @@ function showTab(name) {
   activeTab = name;
 }
 
-// ── Status bar ───────────────────────────────────────────────────────────────
+// ── Status ────────────────────────────────────────────────────────────────────
 
 function setStatus(cls, text) {
-  const bar = document.getElementById('statusBar');
+  const bar  = document.getElementById('statusBar');
   const spin = document.getElementById('statusSpinner');
   bar.className = cls;
   document.getElementById('statusText').textContent = text;
   spin.style.display = (cls === 'done' || cls === 'error') ? 'none' : 'inline-block';
 }
 
-// ── Log ──────────────────────────────────────────────────────────────────────
+// ── Log ───────────────────────────────────────────────────────────────────────
 
 function addLog(level, text) {
-  const log = document.getElementById('eventLog');
+  const log  = document.getElementById('eventLog');
   const line = document.createElement('div');
   const ts   = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  line.className = `log-line ${level}`;
+  line.className   = `log-line ${level}`;
   line.textContent = `${ts}  ${text}`;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
@@ -659,10 +839,615 @@ function addLog(level, text) {
 
 function toggleLog() {
   logOpen = !logOpen;
-  const log = document.getElementById('eventLog');
-  const btn = document.getElementById('logToggle');
-  log.style.display = logOpen ? 'block' : 'none';
-  btn.textContent   = (logOpen ? '▼' : '▶') + ' Event log';
+  document.getElementById('eventLog').style.display = logOpen ? 'block' : 'none';
+  document.getElementById('logToggle').textContent  = (logOpen ? '▼' : '▶') + ' Event log';
+}
+
+// ── Ichimoku Lightweight Chart ────────────────────────────────────────────────
+
+let _ichimokuChart  = null;
+let _ichimokuSeries = null;
+
+function renderIchimokuChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const container = document.getElementById('ichimoku-chart-container');
+  if (_ichimokuChart) { _ichimokuChart.remove(); _ichimokuChart = null; _ichimokuSeries = null; }
+
+  _ichimokuChart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 460,
+    layout: {
+      background:  { type: 'solid', color: '#090d12' },
+      textColor:   '#8b949e',
+      fontSize:    11,
+      fontFamily:  "'SF Mono', 'Fira Code', monospace",
+    },
+    grid: {
+      vertLines: { color: '#30363d22' },
+      horzLines: { color: '#30363d22' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor:  '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      borderColor:    '#30363d',
+      timeVisible:    true,
+      secondsVisible: false,
+      barSpacing:     9,
+      rightOffset:    6,
+    },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale:  { mouseWheel: true, pinch: true },
+  });
+
+  // Kumo-colored candlesticks
+  _ichimokuSeries = _ichimokuChart.addCandlestickSeries({
+    upColor:          '#26a69a',
+    downColor:        '#ef5350',
+    borderUpColor:    '#26a69a',
+    borderDownColor:  '#ef5350',
+    wickUpColor:      '#26a69a',
+    wickDownColor:    '#ef5350',
+    priceLineVisible: false,
+    lastValueVisible: true,
+  });
+
+  const bars = (chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  }));
+  _ichimokuSeries.setData(bars);
+
+  // Swing + TK cross markers
+  if (chartData.markers && chartData.markers.length) {
+    _ichimokuSeries.setMarkers(chartData.markers);
+  }
+
+  // Tenkan Sen (blue-green, solid)
+  if (chartData.tenkan && chartData.tenkan.length) {
+    const s = _ichimokuChart.addLineSeries({
+      color: '#26a69a', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false,
+    });
+    s.setData(chartData.tenkan);
+  }
+
+  // Kijun Sen (red, solid)
+  if (chartData.kijun && chartData.kijun.length) {
+    const s = _ichimokuChart.addLineSeries({
+      color: '#ef5350', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false,
+    });
+    s.setData(chartData.kijun);
+  }
+
+  // Senkou Span A (green, dashed)
+  if (chartData.span_a && chartData.span_a.length) {
+    const s = _ichimokuChart.addLineSeries({
+      color: '#00c89699', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: false,
+    });
+    s.setData(chartData.span_a);
+  }
+
+  // Senkou Span B (red, dashed)
+  if (chartData.span_b && chartData.span_b.length) {
+    const s = _ichimokuChart.addLineSeries({
+      color: '#ef535099', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false, lastValueVisible: false,
+    });
+    s.setData(chartData.span_b);
+  }
+
+  // Chikou Span (white, thin)
+  if (chartData.chikou && chartData.chikou.length) {
+    const s = _ichimokuChart.addLineSeries({
+      color: '#ffffff66', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false,
+    });
+    s.setData(chartData.chikou);
+  }
+
+  // Price target lines (N/E/V/NT/2E/3E + cloud levels)
+  const styleMap = [LightweightCharts.LineStyle.Solid,
+                    LightweightCharts.LineStyle.Dotted,
+                    LightweightCharts.LineStyle.Dashed,
+                    LightweightCharts.LineStyle.LargeDashed];
+  (chartData.price_lines || []).forEach(pl => {
+    _ichimokuSeries.createPriceLine({
+      price:            pl.price,
+      color:            pl.color,
+      lineWidth:        pl.width || 1,
+      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true,
+      title:            pl.label || '',
+    });
+  });
+
+  _ichimokuChart.timeScale().fitContent();
+
+  // Summary bar
+  const sm    = chartData.summary || {};
+  const sumEl = document.getElementById('ichimoku-summary');
+  if (sm.kumo_pos) {
+    const kumoColors = { above: '#00c896', below: '#ef5350', inside: '#7c4dff' };
+    const kumoCol = kumoColors[sm.kumo_pos] || '#8b949e';
+    const tkCol   = sm.last_tk_cross === 'bull' ? '#00c896' : sm.last_tk_cross === 'bear' ? '#ef5350' : '#8b949e';
+    const tkTxt   = sm.last_tk_cross === 'bull' ? '▲ Bull TK' : sm.last_tk_cross === 'bear' ? '▼ Bear TK' : 'No TK';
+    const waveCol = sm.target_dir === 'bullish' ? '#00c896' : sm.target_dir === 'bearish' ? '#ef5350' : '#8b949e';
+    const nTgt    = sm.targets && sm.targets.N;
+    const eTgt    = sm.targets && sm.targets.E;
+    sumEl.innerHTML = `
+      <div class="ichi-stat"><span class="ichi-stat-label">Kumo</span><span class="ichi-stat-val" style="color:${kumoCol}">${sm.kumo_pos.charAt(0).toUpperCase() + sm.kumo_pos.slice(1)}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">TK</span><span class="ichi-stat-val" style="color:${tkCol}">${tkTxt}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">N-wave</span><span class="ichi-stat-val" style="color:${waveCol}">${sm.target_dir || '—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Swings</span><span class="ichi-stat-val">${sm.swing_count}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">N Target</span><span class="ichi-stat-val">${nTgt ? '$' + nTgt.toFixed(2) : '—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">E Target</span><span class="ichi-stat-val">${eTgt ? '$' + eTgt.toFixed(2) : '—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Tenkan</span><span class="ichi-stat-val" style="color:#26a69a">${sm.tenkan ? '$' + sm.tenkan.toFixed(2) : '—'}</span></div>
+      <div class="ichi-stat"><span class="ichi-stat-label">Kijun</span><span class="ichi-stat-val" style="color:#ef5350">${sm.kijun ? '$' + sm.kijun.toFixed(2) : '—'}</span></div>
+    `;
+    sumEl.style.display = 'flex';
+  }
+
+  // Responsive resize
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0].contentRect.width;
+    if (_ichimokuChart && w > 0) _ichimokuChart.resize(w, 460);
+  });
+  ro.observe(container);
+}
+
+// ── Harmonic Lightweight Chart ────────────────────────────────────────────────
+
+let _harmonicChart  = null;
+let _harmonicSeries = null;
+
+function renderHarmonicChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const container = document.getElementById('harmonic-chart-container');
+  if (_harmonicChart) { _harmonicChart.remove(); _harmonicChart = null; _harmonicSeries = null; }
+
+  _harmonicChart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 420,
+    layout: {
+      background:  { type: 'solid', color: '#090d12' },
+      textColor:   '#8b949e',
+      fontSize:    11,
+      fontFamily:  "'SF Mono', 'Fira Code', monospace",
+    },
+    grid: {
+      vertLines: { color: '#30363d22' },
+      horzLines: { color: '#30363d22' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor:  '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      borderColor:    '#30363d',
+      timeVisible:    true,
+      secondsVisible: false,
+      barSpacing:     9,
+      rightOffset:    6,
+    },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale:  { mouseWheel: true, pinch: true },
+  });
+
+  _harmonicSeries = _harmonicChart.addCandlestickSeries({
+    upColor:          '#26a69a',
+    downColor:        '#ef5350',
+    borderUpColor:    '#26a69a',
+    borderDownColor:  '#ef5350',
+    wickUpColor:      '#26a69a',
+    wickDownColor:    '#ef5350',
+    priceLineVisible: false,
+    lastValueVisible: true,
+  });
+
+  // Plain neutral candles
+  const bars = (chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  }));
+  _harmonicSeries.setData(bars);
+
+  // XABCD pivot markers
+  if (chartData.markers && chartData.markers.length) {
+    _harmonicSeries.setMarkers(chartData.markers);
+  }
+
+  // PRZ price lines (top, mid, bot of most recent pattern)
+  const styleMap = [LightweightCharts.LineStyle.Solid,
+                    LightweightCharts.LineStyle.Dotted,
+                    LightweightCharts.LineStyle.Dashed,
+                    LightweightCharts.LineStyle.LargeDashed];
+  (chartData.price_lines || []).forEach(pl => {
+    _harmonicSeries.createPriceLine({
+      price:            pl.price,
+      color:            pl.color,
+      lineWidth:        pl.width || 1,
+      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true,
+      title:            pl.label || '',
+    });
+  });
+
+  _harmonicChart.timeScale().fitContent();
+
+  // PRZ info bar
+  const sm  = chartData.summary || {};
+  const bar = document.getElementById('harmonic-prz-bar');
+  if (sm.latest_pattern) {
+    const bull    = sm.latest_bullish;
+    const inPrz   = sm.price_in_prz;
+    const dirCls  = bull ? 'hav-chip-bull' : 'hav-chip-bear';
+    const dirArrow = bull ? '▲' : '▼';
+    bar.innerHTML = `
+      <span class="hav-prz-chip ${dirCls}">${dirArrow} ${sm.latest_pattern}</span>
+      <span class="hav-prz-chip hav-chip-prz">Score ${sm.latest_score}/10${sm.latest_abcd ? ' ✓' : ' ⚠'}</span>
+      <span class="hav-prz-chip hav-chip-prz">PRZ $${sm.latest_prz_bot?.toFixed(2)} – $${sm.latest_prz_top?.toFixed(2)}</span>
+      ${inPrz ? '<span class="hav-prz-chip hav-chip-in">★ Price IN PRZ</span>' : ''}
+      <span class="hav-prz-chip" style="background:#1a1f2c;color:var(--muted);border:1px solid #30363d">${sm.pattern_count} pattern${sm.pattern_count !== 1 ? 's' : ''} total</span>
+    `;
+    bar.style.display = 'flex';
+  } else {
+    bar.innerHTML = '<span style="color:var(--muted);font-size:11px;padding:4px 0">No confirmed harmonic patterns — normal on daily TF (1–4/year expected)</span>';
+    bar.style.display = 'flex';
+  }
+
+  // Responsive resize
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0].contentRect.width;
+    if (_harmonicChart && w > 0) _harmonicChart.resize(w, 420);
+  });
+  ro.observe(container);
+}
+
+// ── MCPE Lightweight Chart ────────────────────────────────────────────────────
+
+let _mcpeChart  = null;
+let _mcpeSeries = null;
+
+function renderMcpeChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const container = document.getElementById('mcpe-chart-container');
+  if (_mcpeChart) { _mcpeChart.remove(); _mcpeChart = null; _mcpeSeries = null; }
+
+  _mcpeChart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 420,
+    layout: {
+      background:  { type: 'solid', color: '#090d12' },
+      textColor:   '#8b949e',
+      fontSize:    11,
+      fontFamily:  "'SF Mono', 'Fira Code', monospace",
+    },
+    grid: {
+      vertLines: { color: '#30363d22' },
+      horzLines: { color: '#30363d22' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor:  '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      borderColor:    '#30363d',
+      timeVisible:    true,
+      secondsVisible: false,
+      barSpacing:     9,
+      rightOffset:    6,
+    },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale:  { mouseWheel: true, pinch: true },
+  });
+
+  _mcpeSeries = _mcpeChart.addCandlestickSeries({
+    upColor:          '#26a69a',
+    downColor:        '#ef5350',
+    borderUpColor:    '#26a69a',
+    borderDownColor:  '#ef5350',
+    wickUpColor:      '#26a69a',
+    wickDownColor:    '#ef5350',
+    priceLineVisible: false,
+    lastValueVisible: true,
+  });
+
+  // Phase-colored candlestick bars
+  const bars = (chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  }));
+  _mcpeSeries.setData(bars);
+
+  // Phase transition markers
+  if (chartData.markers && chartData.markers.length) {
+    _mcpeSeries.setMarkers(chartData.markers);
+  }
+
+  // Price lines: Cycle High, Mid, Low, Projection target
+  const styleMap = [LightweightCharts.LineStyle.Solid,
+                    LightweightCharts.LineStyle.Dotted,
+                    LightweightCharts.LineStyle.Dashed,
+                    LightweightCharts.LineStyle.LargeDashed];
+  (chartData.price_lines || []).forEach(pl => {
+    _mcpeSeries.createPriceLine({
+      price:            pl.price,
+      color:            pl.color,
+      lineWidth:        pl.width || 1,
+      lineStyle:        styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true,
+      title:            pl.label || '',
+    });
+  });
+
+  _mcpeChart.timeScale().fitContent();
+
+  // Summary stats bar
+  const sm   = chartData.summary || {};
+  const sumEl = document.getElementById('mcpe-summary');
+  if (sm.phase) {
+    const phaseColors = {
+      Markup:       '#00e676',
+      Accumulation: '#00bcd4',
+      Distribution: '#ff9800',
+      Markdown:     '#ff5252',
+      Transition:   '#7c4dff',
+    };
+    const col = phaseColors[sm.phase] || '#8b949e';
+    sumEl.innerHTML = `
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Phase</span><span class="mcpe-stat-val" style="color:${col}">${sm.phase}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Duration</span><span class="mcpe-stat-val">${sm.phase_duration}b</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Position</span><span class="mcpe-stat-val">${sm.price_pos_pct}%</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Strength</span><span class="mcpe-stat-val">${sm.cycle_strength}/100</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Volatility</span><span class="mcpe-stat-val">${sm.volatility}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Volume</span><span class="mcpe-stat-val">${sm.vol_status}</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Projection</span><span class="mcpe-stat-val" style="color:${sm.proj_up ? '#00e676' : '#ff5252'}">${sm.proj_up ? '↑' : '↓'} ${sm.proj_pct?.toFixed(1)}%</span></div>
+      <div class="mcpe-stat"><span class="mcpe-stat-label">Next</span><span class="mcpe-stat-val">${sm.next_phase}</span></div>
+    `;
+    sumEl.style.display = 'flex';
+  }
+
+  // Responsive resize
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0].contentRect.width;
+    if (_mcpeChart && w > 0) _mcpeChart.resize(w, 420);
+  });
+  ro.observe(container);
+}
+
+// ── FibStruct Lightweight Chart ───────────────────────────────────────────────
+
+let _fibStructChart = null;
+let _fibStructSeries = null;
+
+function renderFibStructChart(chartData) {
+  if (!chartData || typeof LightweightCharts === 'undefined') return;
+
+  const container = document.getElementById('fibstruct-chart-container');
+  if (_fibStructChart) { _fibStructChart.remove(); _fibStructChart = null; _fibStructSeries = null; }
+
+  const darkTheme = {
+    width:  container.clientWidth,
+    height: 420,
+    layout: {
+      background:  { type: 'solid', color: '#090d12' },
+      textColor:   '#8b949e',
+      fontSize:    11,
+      fontFamily:  "'SF Mono', 'Fira Code', monospace",
+    },
+    grid: {
+      vertLines: { color: '#30363d22' },
+      horzLines: { color: '#30363d22' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor:  '#30363d',
+      scaleMargins: { top: 0.10, bottom: 0.10 },
+    },
+    timeScale: {
+      borderColor:    '#30363d',
+      timeVisible:    true,
+      secondsVisible: false,
+      barSpacing:     9,
+      rightOffset:    6,
+    },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale:  { mouseWheel: true, pinch: true },
+  };
+
+  _fibStructChart = LightweightCharts.createChart(container, darkTheme);
+
+  _fibStructSeries = _fibStructChart.addCandlestickSeries({
+    upColor:         '#26a69a',
+    downColor:       '#ef5350',
+    borderUpColor:   '#26a69a',
+    borderDownColor: '#ef5350',
+    wickUpColor:     '#26a69a',
+    wickDownColor:   '#ef5350',
+    priceLineVisible: false,
+    lastValueVisible: true,
+  });
+
+  // Candlestick bars (signal-colored)
+  const bars = (chartData.bars || []).map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+    color: b.color, wickColor: b.wickColor, borderColor: b.borderColor,
+  }));
+  _fibStructSeries.setData(bars);
+
+  // Markers (swing labels, BOS/CHoCH, sweeps, BUY/SELL)
+  if (chartData.markers && chartData.markers.length) {
+    _fibStructSeries.setMarkers(chartData.markers);
+  }
+
+  // Fib price lines (horizontal levels)
+  (chartData.price_lines || []).forEach(pl => {
+    // style: 0=solid, 1=dotted, 2=dashed, 3=largeDashed
+    const styleMap = [LightweightCharts.LineStyle.Solid,
+                      LightweightCharts.LineStyle.Dotted,
+                      LightweightCharts.LineStyle.Dashed,
+                      LightweightCharts.LineStyle.LargeDashed];
+    _fibStructSeries.createPriceLine({
+      price:               pl.price,
+      color:               pl.color,
+      lineWidth:           pl.width || 1,
+      lineStyle:           styleMap[pl.style] ?? LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible:    true,
+      title:               pl.label || '',
+    });
+  });
+
+  _fibStructChart.timeScale().fitContent();
+
+  // Zone chips (golden zone + target zone)
+  const gz  = chartData.golden_zone || {};
+  const tz  = chartData.target_zone || {};
+  const chips = document.getElementById('fibstruct-zone-chips');
+  chips.innerHTML = '';
+  if (gz.top && gz.bot) {
+    chips.innerHTML += `<span class="fib-zone-chip fib-zone-golden">★ Golden Zone 0.5–0.786  $${gz.bot.toFixed(2)} – $${gz.top.toFixed(2)}</span>`;
+  }
+  if (tz.top && tz.bot) {
+    const cls = tz.direction >= 0 ? 'fib-zone-target-bull' : 'fib-zone-target-bear';
+    const arrow = tz.direction >= 0 ? '↑' : '↓';
+    chips.innerHTML += `<span class="fib-zone-chip ${cls}">${arrow} Target Zone -0.5–-0.618  $${tz.bot.toFixed(2)} – $${tz.top.toFixed(2)}</span>`;
+  }
+  document.getElementById('fibstruct-zones').style.display = chips.children.length ? 'block' : 'none';
+
+  // Responsive resize
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0].contentRect.width;
+    if (_fibStructChart && w > 0) _fibStructChart.resize(w, 420);
+  });
+  ro.observe(container);
+}
+
+// ── DeMark Lightweight Chart ──────────────────────────────────────────────────
+
+let _demarkChart = null;
+let _demarkSeries = null;
+
+function renderDemarkChart(chartData) {
+  if (!chartData || !chartData.length || typeof LightweightCharts === 'undefined') return;
+
+  const container = document.getElementById('demark-chart-container');
+
+  // Destroy previous instance
+  if (_demarkChart) {
+    _demarkChart.remove();
+    _demarkChart = null;
+    _demarkSeries = null;
+  }
+
+  _demarkChart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 380,
+    layout: {
+      background:    { type: 'solid', color: '#090d12' },
+      textColor:     '#8b949e',
+      fontSize:      11,
+      fontFamily:    "'SF Mono', 'Fira Code', monospace",
+    },
+    grid: {
+      vertLines: { color: '#30363d33' },
+      horzLines: { color: '#30363d33' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+      horzLine: { color: '#58a6ff55', labelBackgroundColor: '#1f6feb' },
+    },
+    rightPriceScale: {
+      borderColor: '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      borderColor:     '#30363d',
+      timeVisible:     true,
+      secondsVisible:  false,
+      barSpacing:      10,
+      rightOffset:     6,
+    },
+    handleScroll:   { mouseWheel: true, pressedMouseMove: true },
+    handleScale:    { mouseWheel: true, pinch: true },
+  });
+
+  _demarkSeries = _demarkChart.addCandlestickSeries({
+    upColor:        '#26a69a',
+    downColor:      '#ef5350',
+    borderUpColor:  '#26a69a',
+    borderDownColor:'#ef5350',
+    wickUpColor:    '#26a69a',
+    wickDownColor:  '#ef5350',
+    priceLineVisible: false,
+    lastValueVisible: true,
+  });
+
+  // Per-candle colored data (DeMark heatmap colors from Pine Script)
+  _demarkSeries.setData(chartData.map(b => ({
+    time:        b.time,
+    open:        b.open,
+    high:        b.high,
+    low:         b.low,
+    close:       b.close,
+    color:       b.color,
+    wickColor:   b.wickColor,
+    borderColor: b.borderColor,
+  })));
+
+  // Markers: counts 7-8, 10-12 as small dots; 9 and 13 as arrows
+  const markers = [];
+  chartData.forEach(b => {
+    if (!b.label) return;
+    const isBuy        = b.buy > 0;
+    const isExhaustion = b.label.startsWith('Long') || b.label.startsWith('Short');
+    markers.push({
+      time:     b.time,
+      position: isBuy ? 'belowBar' : 'aboveBar',
+      color:    isExhaustion
+                  ? (isBuy ? '#3fb950' : '#f85149')
+                  : (isBuy ? '#58a6ff' : '#d29922'),
+      shape:    isExhaustion ? (isBuy ? 'arrowUp' : 'arrowDown') : 'circle',
+      text:     b.label,
+      size:     isExhaustion ? 2 : 1,
+    });
+  });
+  _demarkSeries.setMarkers(markers);
+
+  _demarkChart.timeScale().fitContent();
+
+  // Responsive resize
+  const ro = new ResizeObserver(entries => {
+    const w = entries[0].contentRect.width;
+    if (_demarkChart && w > 0) _demarkChart.resize(w, 380);
+  });
+  ro.observe(container);
 }
 </script>
 </body>
